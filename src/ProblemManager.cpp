@@ -1,5 +1,5 @@
 /****************************************************************************
- * Copyright (c) 2021 by the CajitaFluids authors                           *
+ * Copyright (c) 2018-2020 by the CajitaFluids authors                      *
  * All rights reserved.                                                     *
  *                                                                          *
  * This file is part of the CajitaFluids benchmark. CajitaFluids is         *
@@ -9,15 +9,15 @@
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#include <Mesh.hpp>
+#include <ProblemManager.hpp>
 
 namespace CajitaFluids
 {
 //---------------------------------------------------------------------------//
-template class Mesh<2, Kokkos::HostSpace>;
+template class ProblemManager<2, Kokkos::HostSpace>;
 
 #ifdef KOKKOS_ENABLE_CUDA
-template class Mesh<2, Kokkos::CudaSpace>;
+template class ProblemManager<2, Kokkos::CudaSpace>;
 #endif
 
 //---------------------------------------------------------------------------//

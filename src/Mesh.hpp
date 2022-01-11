@@ -1,16 +1,16 @@
 /****************************************************************************
- * Copyright (c) 2021 by the CabandFluids authors                      *
+ * Copyright (c) 2021 by the CajitaFluids authors                      *
  * All rights reserved.                                                     *
  *                                                                          *
- * This file is part of the CabandFluids benchmark. CabanaFluids is         *
+ * This file is part of the CajitaFluids benchmark. CajitaFluids is         *
  * distributed under a BSD 3-clause license. For the licensing terms see    *
  * the LICENSE file in the top-level directory.                             *
  *                                                                          *
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CABANAFLUIDS_MESH_HPP
-#define CABANAFLUIDS_MESH_HPP
+#ifndef CAJITAFLUIDS_MESH_HPP
+#define CAJITAFLUIDS_MESH_HPP
 
 #include <Cajita.hpp>
 
@@ -22,7 +22,7 @@
 
 #include <limits>
 
-namespace CabanaFluids
+namespace CajitaFluids
 {
 //---------------------------------------------------------------------------//
 /*!
@@ -104,7 +104,7 @@ class Mesh
     }
 
     // Get the local grid.
-    const std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double>>>&
+    const std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double, Dim>>>&
     localGrid() const
     {
         return _local_grid;
@@ -129,7 +129,7 @@ class Mesh
     }
 
   public:
-    std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double>>> _local_grid;
+    std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double, Dim>>> _local_grid;
 
     Kokkos::Array<int, Dim> _min_domain_global_node_index;
     Kokkos::Array<int, Dim> _max_domain_global_node_index;
@@ -137,6 +137,6 @@ class Mesh
 
 //---------------------------------------------------------------------------//
 
-} // end namespace CabanaFluids
+} // end namespace CajitaFluids
 
-#endif // end CABANAFLUIDS_MESH_HPP
+#endif // end CAJITAFLUIDS_MESH_HPP
