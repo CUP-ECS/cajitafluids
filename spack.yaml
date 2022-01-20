@@ -4,8 +4,7 @@ spack:
   - hdf5+mpi
   - openmpi@4.0.5
   - silo@4.11
-  - kokkos std=17 +pthread +hwloc -numactl
-  - heffte +fftw
+  - kokkos std=17 +hwloc +cuda +wrapper -numactl
   - cabana +hypre +heffte +mpi
   concretization: together
   view: true

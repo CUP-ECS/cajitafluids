@@ -161,7 +161,6 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
         }
     }
 
-  private:
 
     void initializeSolverMatrix()
     {
@@ -186,7 +185,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
         auto scale = _density * _mesh->cellSize() * _mesh->cellSize();
 	Kokkos::parallel_for("fill_matrix_entries",
             createExecutionPolicy( owned_space, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
+            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
 		int gi, gj;
 		l2g(i, j, gi, gj);
                 entry_view( i, j, 0 ) = 4.0*scale;
@@ -215,11 +214,11 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	local_mesh.coordinates( Cell(), baseidx, baseloc);
         Kokkos::parallel_for( "add external inputs",
             createExecutionPolicy( owned_cells, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
-		int index[2] = {i, j};
-		double loc[2] = {baseloc[0] + i * cell_size, baseloc[i] + j * cell_size};
-                _source(Cajita::Cell(), quantity, index, loc, _dt, cell_area);
-                _body(Cajita::Cell(), quantity, index, loc, _dt, cell_area);
+            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+		double x = baseloc[0] + i * cell_size, 
+		       y = baseloc[i] + j * cell_size;
+                _source(Cajita::Cell(), quantity, i, j, x, y, _dt, cell_area);
+                _body(Cajita::Cell(), quantity, i, j, x, y, _dt, cell_area);
             });
 
         auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
@@ -227,11 +226,11 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	local_mesh.coordinates( FaceI(), baseidx, baseloc);
         Kokkos::parallel_for( "add external inputs",
             createExecutionPolicy( owned_ifaces, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
-		int index[2] = {i, j};
-		double loc[2] = {baseloc[0] + i * cell_size, baseloc[i] + j * cell_size};
-                _source(FaceI(), ui, index, loc, _dt, cell_area);
-                _body(FaceI(), ui, index, loc, _dt, cell_area);
+            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+		double x = baseloc[0] + i * cell_size, 
+		       y = baseloc[i] + j * cell_size;
+                _source(FaceI(), quantity, i, j, x, y, _dt, cell_area);
+                _body(FaceI(), quantity, i, j, x, y, _dt, cell_area);
             });
 
         auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
@@ -239,11 +238,11 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	local_mesh.coordinates( FaceJ(), baseidx, baseloc);
         Kokkos::parallel_for( "add external inputs",
             createExecutionPolicy( owned_jfaces, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
-		int index[2] = {i, j};
-		double loc[2] = {baseloc[0] + i * cell_size, baseloc[i] + j * cell_size};
-                _source(FaceJ(), uj, index, loc, _dt, cell_area);
-                _body(FaceJ(), uj, index, loc, _dt, cell_area);
+            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+		double x = baseloc[0] + i * cell_size, 
+		       y = baseloc[i] + j * cell_size;
+                _source(FaceJ(), quantity, i, j, x, y, _dt, cell_area);
+                _body(FaceJ(), quantity, i, j, x, y, _dt, cell_area);
             });
     }
 
@@ -254,6 +253,8 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
     void _buildRHS() 
     {
     }
+
+  private:
 
     /* Solver state variables */
     double _dt;
@@ -288,7 +289,7 @@ createSolver( const std::string& device, MPI_Comm comm,
 {
     if ( 0 == device.compare( "serial" ) )
     {
-#ifdef KOKKOS_ENABLE_SERIAL
+#if defined(KOKKOS_ENABLE_SERIAL)
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::HostSpace, Kokkos::Serial>>(
             comm, global_bounding_box, global_num_cell, partitioner,
@@ -299,7 +300,7 @@ createSolver( const std::string& device, MPI_Comm comm,
     }
     else if ( 0 == device.compare( "openmp" ) )
     {
-#ifdef KOKKOS_ENABLE_OPENMP
+#if defined(KOKKOS_ENABLE_OPENMP)
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::HostSpace, Kokkos::OpenMP>>(
             comm, global_bounding_box, global_num_cell, partitioner,
