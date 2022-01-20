@@ -32,14 +32,15 @@ namespace CajitaFluids {
 namespace Field {
 
 /**
- * @struct Density
- * @brief Tag structure for the density of the advected quantity (which doesn't effect pressure!)
+ * @struct Quantity
+ * @brief Tag structure for the quantity of the advected quantity (which doesn't effect pressure!)
  **/
-struct Density {};
+struct Quantity {};
 
 /**
  * @struct Velocity
- * @brief Tag structure for the staggered velocity component on a face of the mesh
+ * @brief Tag structure for the magnitude of the normal velocity component on 
+ * faces of the mesh
  **/
 struct Velocity {};
 
@@ -54,28 +55,24 @@ struct Velocity {};
 template <std::size_t NumSpaceDim, class ExecutionSpace, class MemorySpace>
 class ProblemManager;
 
-using Cajita::Dim;
 
 /* The 2D implementation of hte problem manager class */
 template <class ExecutionSpace, class MemorySpace>
 class ProblemManager<2, ExecutionSpace, MemorySpace>
 {
-  // Pull in a few Cajita type declarations we use a lot
-
   public:
     using memory_space = MemorySpace;
     using execution_space = ExecutionSpace;
     using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
-
     using iface_array = Cajita::Array<double, Cajita::Face<Cajita::Dim::I>,
                                       Cajita::UniformMesh<double, 2>, MemorySpace>;
     using jface_array = Cajita::Array<double, Cajita::Face<Cajita::Dim::J>,
                                       Cajita::UniformMesh<double, 2>, MemorySpace>;
     using cell_array = Cajita::Array<double, Cajita::Cell,
                                      Cajita::UniformMesh<double, 2>, MemorySpace>;
-
     using halo = Cajita::Halo<MemorySpace>;
-    using mesh_type = Mesh<2, MemorySpace>;
+
+    using mesh_type = Mesh<2, ExecutionSpace, MemorySpace>;
 
     template <class InitFunc>
     ProblemManager( const ExecutionSpace& exec_space,
@@ -84,6 +81,9 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         : _mesh( mesh )
         // , other initializers
     {
+	// The layouts of our various arrays for values on the staggered mesh and 
+	// other associated data strutures. Do these needto be version with halos 
+	// associuated with them? XXX
         auto iface_scalar_layout =
             Cajita::createArrayLayout( _mesh->localGrid(), 1, 
                                        Cajita::Face<Cajita::Dim::I>() );
@@ -93,23 +93,41 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         auto cell_scalar_layout =
             Cajita::createArrayLayout( _mesh->localGrid(), 1, Cajita::Cell() );
 
-        // The density of the scalar quantity being advected
-        _density = Cajita::createArray<double, MemorySpace>("density",
-                                                            cell_scalar_layout);
-        _ui = Cajita::createArray<double, MemorySpace>(
-            "ui", iface_scalar_layout);
-        _uj = Cajita::createArray<double, MemorySpace>(
-            "uj", jface_scalar_layout);
+	// Our halo for velocities and cell population information is
+	// 2 deep - semi-lagrangian advection moves data between cells
+        // no farther than 2 steps, and our timestep should be much smaller than
+        // this.
 
-        // Check what the right halo patterns should be here XXX
+	// The actual arrays storing mesh quantities
+        // 1. The quantity of the scalar quantity being advected
+        _quantity = Cajita::createArray<double, MemorySpace>("quantity",
+                                                            cell_scalar_layout);
+	
+	// 2. The magnitudes of the velocities normal to the cell faces
+        _ui = Cajita::createArray<double, MemorySpace>( "ui", iface_scalar_layout);
+        _uj = Cajita::createArray<double, MemorySpace>( "uj", jface_scalar_layout);
+
+        // Halo patterns for the velocity and quantity halos. These halos are 
+	// used for advection calculations, and are two cells deep as that is the
+	// the maximum that we allow quantities to advect in a single timestep.
+        auto halo_pattern = Cajita::HaloPattern<2>();
+        std::vector<std::array<int, 2>> neighbors;
+        for ( int i = -2; i < 3; i++ ) {
+            for ( int j = -2; j < 3; j++ ) {
+                if (  !( i == 0 && j == 0 ) ) {
+                    neighbors.push_back( { i, j } );
+                }
+            }
+        }
+
         _iface_halo = Cajita::createHalo<double, MemorySpace>(
-            *iface_scalar_layout, Cajita::FaceHaloPattern<2>() );
+            *iface_scalar_layout, halo_pattern );
         _jface_halo = Cajita::createHalo<double, MemorySpace>(
-            *jface_scalar_layout, Cajita::FaceHaloPattern<2>() );
+            *jface_scalar_layout, halo_pattern );
         _cell_halo = Cajita::createHalo<double, MemorySpace>(
-            *cell_scalar_layout, Cajita::FullHaloPattern() );
-        
-        // Initialize State Values ( Height, Momentum )
+            *cell_scalar_layout, halo_pattern );
+   
+        // Initialize State Values ( quantity and velocity )
         initialize( create_functor );
     }
 
@@ -124,122 +142,149 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 
         // Get Local Grid and Local Mesh
         auto local_grid = *( _mesh->localGrid() );
-        auto local_mesh = Cajita::createLocalMesh<device_type>( local_grid );
-
+        auto local_mesh = *( _mesh->localMesh() );
+	double cell_size = _mesh->cellSize();
 
         // Get State Arrays
-        auto p = get( Cajita::Cell(), Field::Pressure(), 0 );
-        auto ui = get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), 0 );
-        auto uj = get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), 0 );
+        auto q = get( Cajita::Cell(), Field::Quantity() );
 
-        // Loop Over All Owned Cells ( i, j, k )
+        // Loop Over All Owned Cells ( i, j )
         auto own_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
+        int index[2] = {0, 0};
+        double loc[2]; // x/y loocation of the cell at 0, 0
+	local_mesh.coordinates( Cajita::Cell(), index, loc); 
         Kokkos::parallel_for(
-            "Initializing", Cajita::createExecutionPolicy( own_cells, ExecutionSpace() ), KOKKOS_LAMBDA( const int i, const int j, const int k ) {
+            "Initialize Cells`", Cajita::createExecutionPolicy( own_cells, ExecutionSpace() ), 
+            KOKKOS_LAMBDA( const int i, const int j ) {
                 // Get Coordinates Associated with Indices ( i, j, k )
-                int     coords[3] = { i, j, k };
-                double x[3];
-
-                local_mesh.coordinates( Cajita::Cell(), coords, x );
-
+                int  coords[2] = { i, j };
+                double x[2];
+ 		double quantity;
+		x[0] = loc[0] + cell_size * i;
+		x[1] = loc[1] + cell_size * j;
                 // Initialization Function
-                create_functor( Cajita::Cell(), Field::Pressure(), coords, x, p( i, j, k ));
+                create_functor( Cajita::Cell(), Field::Quantity(), coords, x, 
+                                quantity);
+		q( i, j) = quantity;
             } );
 
-        // Loop Over All Owned I-Faces ( i, j, k )
+        // Loop Over All Owned I-Faces ( i, j )
         auto own_faces = local_grid.indexSpace( 
             Cajita::Own(), Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
+        auto ui = get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
+	local_mesh.coordinates( Cajita::Face<Cajita::Dim::I>(), index, loc ); 
         Kokkos::parallel_for(
-            "Initializing", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), KOKKOS_LAMBDA( const int i, const int j, const int k ) {
-                // Get Coordinates Associated with Indices ( i, j, k )
-                int     coords[3] = { i, j, k };
-                double x[3];
-
-                local_mesh.coordinates( Cajita::Cell(), coords, x );
+            "Initialize I-Faces", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), 
+            KOKKOS_LAMBDA( const int i, const int j ) {
+                // Get Coordinates Associated with Indices ( i, j )
+                int     coords[2] = { i, j };
+                double x[2];
+		double u;
+		x[0] = loc[0] + cell_size * i;
+		x[1] = loc[1] + cell_size * j;
 
                 // Initialization Function
                 create_functor( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), 
-			        coords, x, ui( i, j, k));
+			        coords, x, u);
+		ui(i, j) = u;
             } );
 
-        // Loop Over All Owned J-Faces ( i, j, k )
+        // Loop Over All Owned J-Faces ( i, j )
         own_faces = local_grid.indexSpace( 
-            Cajita::Own(), Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
+            Cajita::Own(), Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
+        auto uj = get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
+	local_mesh.coordinates( Cajita::Face<Cajita::Dim::J>(), index, loc ); 
         Kokkos::parallel_for(
-            "Initializing", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), KOKKOS_LAMBDA( const int i, const int j, const int k ) {
-                // Get Coordinates Associated with Indices ( i, j, k )
-                int     coords[3] = { i, j, k };
-                double x[3];
+            "Initialize J-Faces", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), 
+            KOKKOS_LAMBDA( const int i, const int j, const int k ) {
+                // Get Coordinates Associated with Indices ( i, j )
+                int     coords[2] = { i, j };
+                double x[2];
+		double u;
 
-                local_mesh.coordinates( Cajita::Cell(), coords, x );
+		x[0] = loc[0] + cell_size * i;
+		x[1] = loc[1] + cell_size * j;
 
                 // Initialization Function
                 create_functor( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), 
-			        coords, x, uj( i, j, k) );
+			        coords, x, u );
+		uj(i, j) = u;
             } );
-    }
+    };
 
     /**
      * Return mesh
      * @return Returns Mesh object
      **/
-    const std::shared_ptr<Mesh<2, MemorySpace>> &mesh() const {
+    const std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> &mesh() const {
         return _mesh;
     };
 
     /**
-     * Return Pressure Field
+     * Return Quantity Field
      * @param Location::Cell
-     * @param Field::Height
-     * @return Returns Height state array at cell centers
+     * @param Field::Quantity
+     * @return Returns view of advected quantity at cell centers
      **/
-    typename cell_array::view_type get( Cajita::Cell, Field::Density ) const {
-        return _density->view();
-    }
+    typename cell_array::view_type get( Cajita::Cell, Field::Quantity ) const {
+        return _quantity->view();
+    };
 
     /**
      * Return I Face Velocity 
-     * @param Location::XFace
+     * @param Face<Dim::I>
      * @param Field::Velocity
-     * @return Returns Height state array at cell centers
+     * @return Returns view of norm velocity magnitude on i faces
      **/
     typename cell_array::view_type get( Cajita::Face<Cajita::Dim::I>, Field::Velocity ) const {
         return _ui->view();
-    }
+    };
 
     /**
-     * Return Y Face Velocity 
-     * @param Location::YFace
+     * Return J Face Velocity 
+     * @param Face<Dim::J>
      * @param Field::Velocity
-     * @return Returns Height state array at cell centers
+     * @return Returns view of norm velocity magnitude on j faces
      **/
     typename cell_array::view_type get( Cajita::Face<Cajita::Dim::J>, Field::Velocity ) const {
         return _uj->view();
-    }
+    };
 
 
+#if 0
     /**
      * Scatter State Data to Neighbors
      * @param Location::Cell
      **/
-    void scatter( Cajita::Cell ) const {
-        _cell_halo->scatter( ExecutionSpace(), *_density);
+    void scatter( Cajita::Cell, Field::Quantity) const {
+        _cell_halo->scatter( ExecutionSpace(), *_quantity);
     };
+
+    /**
+     * Scatter State Data to Neighbors
+     * @param Location::Face<Dim::I>
+     **/
     void scatter( Cajita::Face<Cajita::Dim::I> ) const {
         _iface_halo->scatter( ExecutionSpace(), *_ui);
     };
+
+    /**
+     * Scatter State Data to Neighbors
+     * @param Location::Face<Dim::J>
+     **/
     void scatter( Cajita::Face<Cajita::Dim::J> ) const {
         _jface_halo->scatter( ExecutionSpace(), *_uj);
     };
+#endif
 
 
     /**
      * Gather State Data from Neighbors
      * @param Location::Cell
      **/
-    void gather( Cajita::Cell ) const {
-        _cell_halo->gather( ExecutionSpace(), *_density );
-    }
+    void gather( Cajita::Cell, Field::Quantity ) const {
+        _cell_halo->gather( ExecutionSpace(), *_quantity );
+    };
     void gather( Cajita::Face<Cajita::Dim::I> ) const {
         _iface_halo->gather( ExecutionSpace(), *_ui);
     };
@@ -247,8 +292,9 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         _jface_halo->gather( ExecutionSpace(), *_uj);
     };
 
+
   private:
-    std::shared_ptr<cell_array> _density;
+    std::shared_ptr<cell_array> _quantity;
     std::shared_ptr<iface_array> _ui;
     std::shared_ptr<jface_array> _uj;
     std::shared_ptr<mesh_type> _mesh; /**< Mesh object */

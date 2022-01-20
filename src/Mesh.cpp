@@ -14,7 +14,7 @@
 namespace CajitaFluids
 {
 //---------------------------------------------------------------------------//
-template class Mesh<2, Kokkos::HostSpace>;
+template class Mesh<2, Kokkos::DefaultHostExecutionSpace, Kokkos::HostSpace>;
 
 #ifdef KOKKOS_ENABLE_CUDA
 template class Mesh<2, Kokkos::CudaSpace>;

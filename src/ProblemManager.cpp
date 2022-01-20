@@ -10,15 +10,12 @@
  ****************************************************************************/
 
 #include <ProblemManager.hpp>
+#include <Solver.hpp>
 
 namespace CajitaFluids
 {
 //---------------------------------------------------------------------------//
-template class ProblemManager<2, Kokkos::HostSpace>;
-
-#ifdef KOKKOS_ENABLE_CUDA
-template class ProblemManager<2, Kokkos::CudaSpace>;
-#endif
+template class ProblemManager<2, Kokkos::DefaultHostExecutionSpace, Kokkos::HostSpace>;
 
 //---------------------------------------------------------------------------//
 

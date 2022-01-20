@@ -29,18 +29,19 @@ namespace CajitaFluids
   \class Mesh
   \brief Logically and spatially uniform Cartesian mesh.
 */
-template <int Dim, class MemorySpace>
+template <int Dim, class ExecutionSpace, class MemorySpace>
 class Mesh
 {
   public:
     using memory_space = MemorySpace;
+    using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
+    using mesh_type = Cajita::UniformMesh<double, Dim>;
 
     // Construct a mesh.
     Mesh( const Kokkos::Array<double, 2*Dim>& global_bounding_box,
           const std::array<int, Dim>& global_num_cell,
-          const std::array<bool, Dim>& periodic,
           const Cajita::BlockPartitioner<Dim>& partitioner,
-          const int halo_cell_width, const int minimum_halo_cell_width,
+          const int halo_cell_width, 
           MPI_Comm comm )
     {
         // Make a copy of the global number of cells so we can modify it.
@@ -50,9 +51,9 @@ class Mesh
         double cell_size =
             ( global_bounding_box[Dim] - global_bounding_box[0] ) / num_cell[0];
 
-        // Because the mesh is uniform check that the domain is evenly
-        // divisible by the cell size in each dimension within round-off
-        // error. This will let us do cheaper math for particle location.
+        // Because the mesh is uniform width in all directions, check that the 
+        // domain is evenly divisible by the cell size in each dimension 
+        // within round-off error. 
         for ( int d = 0; d < Dim; ++d )
         {
             double extent = num_cell[d] * cell_size;
@@ -72,42 +73,58 @@ class Mesh
 
         for ( int d = 0; d < Dim; ++d )
         {
-            _min_domain_global_node_index[d] = 0;
-            _max_domain_global_node_index[d] = num_cell[d] + 1;
+            _min_domain_global_cell_index[d] = 0;
+            _max_domain_global_cell_index[d] = num_cell[d] - 1;
         }
 
+#if 0
         // For dimensions that are not periodic we pad by the minimum halo
         // cell width to allow for projections outside of the domain.
+        // PGB - We don't do this!
         for ( int d = 0; d < Dim; ++d )
         {
-            if ( !periodic[d] )
-            {
                 global_low_corner[d] -= cell_size * minimum_halo_cell_width;
                 global_high_corner[d] += cell_size * minimum_halo_cell_width;
                 num_cell[d] += 2 * minimum_halo_cell_width;
-                _min_domain_global_node_index[d] += minimum_halo_cell_width;
-                _max_domain_global_node_index[d] -= minimum_halo_cell_width;
+                _min_domain_global_cell_index[d] += minimum_halo_cell_width;
+                _max_domain_global_cell_index[d] -= minimum_halo_cell_width;
             }
         }
+#endif
 
         // Create the global mesh.
         auto global_mesh = Cajita::createUniformGlobalMesh(
             global_low_corner, global_high_corner, num_cell );
 
         // Build the global grid.
+        std::array<bool, Dim> periodic;
+        for (int i = 0; i < Dim; i++) periodic[i] = false;
         auto global_grid = Cajita::createGlobalGrid( comm, global_mesh,
                                                      periodic, partitioner );
 
         // Build the local grid.
-        int halo_width = std::max( minimum_halo_cell_width, halo_cell_width );
+        int halo_width = halo_cell_width;
         _local_grid = Cajita::createLocalGrid( global_grid, halo_width );
+
+        // Build the local mesh. XXX Why is this hard to share? Is it expensive?
+	auto local_mesh = Cajita::createLocalMesh<device_type>( *_local_grid );
+        _local_mesh = std::make_shared<Cajita::LocalMesh<device_type, mesh_type>>(local_mesh);
+
+        MPI_Comm_rank(comm, &_rank);
     }
 
     // Get the local grid.
-    const std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double, Dim>>>&
+    const std::shared_ptr<Cajita::LocalGrid<mesh_type>>&
     localGrid() const
     {
         return _local_grid;
+    }
+
+    // Get the local mesh.
+    const std::shared_ptr<Cajita::LocalMesh<device_type, mesh_type>>&
+    localMesh() const
+    {
+        return _local_mesh;
     }
 
     // Get the cell size.
@@ -117,22 +134,29 @@ class Mesh
     }
 
     // Get the minimum node index in the domain.
-    Kokkos::Array<int, Dim> minDomainGlobalNodeIndex() const
+    Kokkos::Array<int, Dim> minDomainGlobalCellIndex() const
     {
-        return _min_domain_global_node_index;
+        return _min_domain_global_cell_index;
     }
 
     // Get the maximum node index in the domain.
-    Kokkos::Array<int, Dim> maxDomainGlobalNodeIndex() const
+    Kokkos::Array<int, Dim> maxDomainGlobalCellIndex() const
     {
-        return _max_domain_global_node_index;
+        return _max_domain_global_cell_index;
+    }
+
+    int rank() const
+    {
+        return _rank;
     }
 
   public:
-    std::shared_ptr<Cajita::LocalGrid<Cajita::UniformMesh<double, Dim>>> _local_grid;
+    std::shared_ptr<Cajita::LocalGrid<mesh_type>> _local_grid;
+    std::shared_ptr<Cajita::LocalMesh<device_type, mesh_type>> _local_mesh;
 
-    Kokkos::Array<int, Dim> _min_domain_global_node_index;
-    Kokkos::Array<int, Dim> _max_domain_global_node_index;
+    Kokkos::Array<int, Dim> _min_domain_global_cell_index;
+    Kokkos::Array<int, Dim> _max_domain_global_cell_index;
+    int _rank;
 };
 
 //---------------------------------------------------------------------------//
