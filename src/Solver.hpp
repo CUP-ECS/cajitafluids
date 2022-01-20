@@ -289,7 +289,9 @@ createSolver( const std::string& device, MPI_Comm comm,
 {
     if ( 0 == device.compare( "serial" ) )
     {
-#if defined(KOKKOS_ENABLE_SERIAL)
+// Hypre with CUDA support breaks support for the serial solver. We'll need
+// to set it up to use a different solver in that case
+#if defined(KOKKOS_ENABLE_SERIAL) && !defined(KOKKOS_ENABLE_CUDA)
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::HostSpace, Kokkos::Serial>>(
             comm, global_bounding_box, global_num_cell, partitioner,
@@ -300,7 +302,7 @@ createSolver( const std::string& device, MPI_Comm comm,
     }
     else if ( 0 == device.compare( "openmp" ) )
     {
-#if defined(KOKKOS_ENABLE_OPENMP)
+#if defined(KOKKOS_ENABLE_OPENMP) && !defined(KOKKOS_ENABLE_CUDA)
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::HostSpace, Kokkos::OpenMP>>(
             comm, global_bounding_box, global_num_cell, partitioner,

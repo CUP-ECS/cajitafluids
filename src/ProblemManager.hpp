@@ -245,7 +245,6 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     };
 
 
-#if 0
     /**
      * Scatter State Data to Neighbors
      * @param Location::Cell
@@ -269,7 +268,6 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     void scatter( Cajita::Face<Cajita::Dim::J> ) const {
         _jface_halo->scatter( ExecutionSpace(), *_uj);
     };
-#endif
 
 
     /**
