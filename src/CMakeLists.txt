@@ -1,5 +1,7 @@
 set(HEADERS
+  BodySource.hpp
   BoundaryConditions.hpp
+  InflowSource.hpp
   Mesh.hpp
   ProblemManager.hpp
   Solver.hpp
@@ -7,29 +9,19 @@ set(HEADERS
 
 set(SOURCES
   Mesh.cpp
-  ProblemManager.cpp
   )
 
 add_library(cajitafluids ${SOURCES})
 
-if (SILO)
-  target_link_libraries(cajitafluids
-    Kokkos::kokkos
-    MPI::MPI_CXX
-    Cabana::cabanacore
-    Cabana::Cajita
-    ${SILO} )
-else ()
-  target_link_libraries(cajitafluids
-    Kokkos::kokkos
-    MPI::MPI_CXX
-    Cabana::cabanacore
-    Cabana::Cajita
-    )
-endif()
+target_link_libraries(cajitafluids
+  Cabana::cabanacore
+  Cabana::Cajita
+  Silo::silo )
 
 target_include_directories(cajitafluids
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
   )
+
+install(TARGETS cajitafluids LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

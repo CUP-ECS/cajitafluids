@@ -53,27 +53,27 @@ template <> struct BoundaryCondition<2> {
 
             // Left Boundary
             if ( gi <= min[0] ) {
-		matentry(1) = 0; 
+		matentry(i, j, 1) = 0; 
                 if ( boundary_type[0] == BoundaryType::SOLID ) {
-		    matentry(0) -= scale;
+		    matentry(i, j, 0) -= scale;
 		}
             }
             if ( gj <= min[1] ) {
-		matentry(3) = 0;
+		matentry(i, j, 3) = 0;
                 if ( boundary_type[1] == BoundaryType::SOLID ) {
-		    matentry(0) -= scale;
+		    matentry(i, j, 0) -= scale;
 		}
 	    }
             if ( gi > max[0] - 1 ) {
-		matentry(2) = 0; 
+		matentry(i, j, 2) = 0; 
                 if ( boundary_type[2] == BoundaryType::SOLID ) {
-		    matentry(0) -= scale;
+		    matentry(i, j, 0) -= scale;
                 }
             }
             if ( gj > max[1] - 1 ) {
-		matentry(4) = 0; 
+		matentry(i, j, 4) = 0; 
                 if ( boundary_type[3] == BoundaryType::SOLID ) {
-		   matentry(0) -= scale;
+		   matentry(i, j, 0) -= scale;
                 }
             }
         }

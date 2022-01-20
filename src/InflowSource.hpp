@@ -40,7 +40,7 @@ template <> struct InflowSource<2> {
 		/* THis should really be a *rate* of inflow, but we're forcing a quantity at
 		 * the location to start match the formulation of the original incremental
 		 * fluids solver */
-		if ( q(i, j) < _quantity ) q(i, j) = _quantity;
+		if ( q(i, j, 0) < _quantity ) q(i, j, 0) = _quantity;
 	    }
         }
 
@@ -55,7 +55,7 @@ template <> struct InflowSource<2> {
 		&& location[0] < _bounding_box[2] 
 		&& location[1] < _bounding_box[1] 
 		&& location[1] < _bounding_box[3]) {
-		if (ux(i, j) < _velocity[0]) ux(i,j) = _velocity[0];
+		if (ux(i, j, 0) < _velocity[0]) ux(i,j, 0) = _velocity[0];
             }
         }
 
@@ -69,7 +69,7 @@ template <> struct InflowSource<2> {
 		&& location[0] < _bounding_box[2] 
 		&& location[1] < _bounding_box[1] 
 		&& location[1] < _bounding_box[3]) {
-		if (uy(i, j) < _velocity[1]) uy(i,j) = _velocity[1];
+		if (uy(i, j, 0) < _velocity[1]) uy(i,j,0) = _velocity[1];
             }
         }
  

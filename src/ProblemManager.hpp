@@ -159,13 +159,11 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
                 // Get Coordinates Associated with Indices ( i, j, k )
                 int  coords[2] = { i, j };
                 double x[2];
- 		double quantity;
 		x[0] = loc[0] + cell_size * i;
 		x[1] = loc[1] + cell_size * j;
                 // Initialization Function
                 create_functor( Cajita::Cell(), Field::Quantity(), coords, x, 
-                                quantity);
-		q( i, j) = quantity;
+                                q(i, j, 0));
             } );
 
         // Loop Over All Owned I-Faces ( i, j )
@@ -179,14 +177,12 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
                 // Get Coordinates Associated with Indices ( i, j )
                 int     coords[2] = { i, j };
                 double x[2];
-		double u;
 		x[0] = loc[0] + cell_size * i;
 		x[1] = loc[1] + cell_size * j;
 
                 // Initialization Function
                 create_functor( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), 
-			        coords, x, u);
-		ui(i, j) = u;
+			        coords, x, ui(i, j, 0));
             } );
 
         // Loop Over All Owned J-Faces ( i, j )
@@ -196,19 +192,17 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 	local_mesh.coordinates( Cajita::Face<Cajita::Dim::J>(), index, loc ); 
         Kokkos::parallel_for(
             "Initialize J-Faces", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), 
-            KOKKOS_LAMBDA( const int i, const int j, const int k ) {
+            KOKKOS_LAMBDA( const int i, const int j ) {
                 // Get Coordinates Associated with Indices ( i, j )
                 int     coords[2] = { i, j };
                 double x[2];
-		double u;
 
 		x[0] = loc[0] + cell_size * i;
 		x[1] = loc[1] + cell_size * j;
 
                 // Initialization Function
                 create_functor( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), 
-			        coords, x, u );
-		uj(i, j) = u;
+			        coords, x, uj(i, j, 0) );
             } );
     };
 

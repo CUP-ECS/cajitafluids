@@ -40,7 +40,7 @@ template <> struct BodyForce<2> {
 						double delta_t, double v) const
         {
 	    int i = index[0], j = index[1];
-            ux(i, j) += _force[0] * delta_t;
+            ux(i, j, 0) += _force[0] * delta_t;
         }
 
         template <class ArrayType>
@@ -49,7 +49,7 @@ template <> struct BodyForce<2> {
 						double delta_t, double v) const
         {
 	    int i = index[0], j = index[1];
-            uy(i, j) += _force[1] * delta_t;
+            uy(i, j, 0) += _force[1] * delta_t;
         }
 
         BodyForce(double fx, double fy) { _force[0] = fx; _force[1] = fy; }

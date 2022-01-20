@@ -67,7 +67,8 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	    const InflowSource<2> &source,
             const BodyForce<2> &body,
             const double delta_t )
-        : _halo_min( 2 ), _density(density), _bc(bc), _dt( delta_t)
+        : _halo_min( 2 ), _density(density), _bc(bc), 
+	  _source(source), _body(body), _dt( delta_t)
     {
         _mesh = std::make_shared<Mesh<2, ExecutionSpace, MemorySpace>>(
             global_bounding_box, global_num_cell, partitioner,
@@ -114,16 +115,15 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
             _pm->get( Location::Particle(), Field::J() ) );
 #endif
 	int t = 0;
-        int num_step = t_final / _dt;
-        double delta_t = t_final / num_step;
         double time = 0.0;
+	int num_step = 0;
         while ( (time < t_final) ) 
         {
             if ( 0 == _mesh->rank() && 0 == t % write_freq )
                 printf( "Step %d / %d at time = %f\n", t + 1, num_step, time );
 
 	    // 1. Handle inflow and body forces.
-	    addExternalInputs(delta_t);
+	    addExternalInputs();
 
 #if 0
 	    // 2. Do the pressure solve to make the velocity field after inflow 
@@ -134,7 +134,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	    _pm->gather( FaceJ(), Field::Velocity() );
             _buildRHS();
 	    _pressure_solver->solve( *_lhs, *_rhs );
-	    _apply_pressure(delta_t);
+	    _apply_pressure();
 #endif    
 
 #if 0
@@ -143,7 +143,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	    _pm->gather( FaceI(), Field::Velocity() );
 	    _pm->gather( FaceJ(), Field::Velocity() );
             // 3.2 XXX Do a time step of advection
-            //TimeIntegrator::step( ExecutionSpace(), *_pm, delta_t, _bc );
+            //TimeIntegrator::step( ExecutionSpace(), *_pm, _dt, _bc );
 #endif
 
 #if 0
@@ -156,7 +156,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
                     _pm->get( Location::Particle(), Field::J() ) );
 #endif
 
-            time += delta_t;
+            time += _dt;
             t++;
         }
     }
@@ -200,7 +200,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
     }
 
     /* Internal methods for the solver */
-    void addExternalInputs(InflowSource<2> &source, BodyForce<2> &body, double delta_t)
+    void addExternalInputs()
     {
         auto local_grid = *( _mesh->localGrid() );
         auto local_mesh = *( _mesh->localMesh() );
@@ -218,8 +218,8 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
             KOKKOS_LAMBDA( const int i, const int j ) {
 		int index[2] = {i, j};
 		double loc[2] = {baseloc[0] + i * cell_size, baseloc[i] + j * cell_size};
-                source(Cajita::Cell(), quantity, index, loc, delta_t, cell_area);
-                body(Cajita::Cell(), quantity, index, loc, delta_t, cell_area);
+                _source(Cajita::Cell(), quantity, index, loc, _dt, cell_area);
+                _body(Cajita::Cell(), quantity, index, loc, _dt, cell_area);
             });
 
         auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
@@ -230,8 +230,8 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
             KOKKOS_LAMBDA( const int i, const int j ) {
 		int index[2] = {i, j};
 		double loc[2] = {baseloc[0] + i * cell_size, baseloc[i] + j * cell_size};
-                source(FaceI(), ui, index, loc, delta_t, cell_area);
-                body(FaceI(), ui, index, loc, delta_t, cell_area);
+                _source(FaceI(), ui, index, loc, _dt, cell_area);
+                _body(FaceI(), ui, index, loc, _dt, cell_area);
             });
 
         auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
@@ -242,12 +242,12 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
             KOKKOS_LAMBDA( const int i, const int j ) {
 		int index[2] = {i, j};
 		double loc[2] = {baseloc[0] + i * cell_size, baseloc[i] + j * cell_size};
-                source(FaceJ(), uj, index, loc, delta_t, cell_area);
-                body(FaceJ(), uj, index, loc, delta_t, cell_area);
+                _source(FaceJ(), uj, index, loc, _dt, cell_area);
+                _body(FaceJ(), uj, index, loc, _dt, cell_area);
             });
     }
 
-    void _apply_pressure(double delta_t) 
+    void _apply_pressure()
     {
     }
 
@@ -259,6 +259,8 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
     double _dt;
     double _density;
     double _cell_area;
+    BodyForce<2> _body;
+    InflowSource<2> _source;
     BoundaryCondition<2> _bc;
     int _halo_min;
     std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
