@@ -41,7 +41,7 @@ class SiloWriter {
     template <class ProblemManagerType>
     SiloWriter( ProblemManagerType &pm )
         : _pm( pm ) {
-        if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cout << "Created CajitaFluids SiloWriter\n";
+        if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cerr << "Created CajitaFluids SiloWriter\n";
     };
 
     /**
@@ -52,7 +52,7 @@ class SiloWriter {
      * @param time Current tim
      * @param dt Time Step (dt)
      **/
-    void writeFile( DBfile *dbfile, char *name, int time_step, double time, double dt ) {
+    void writeFile( DBfile *dbfile, char *meshname, int time_step, double time, double dt ) {
         // Initialize Variables
         int        dims[Dims], zdims[Dims];
         double    *coords[Dims], *vars[Dims], spacing[Dims];
@@ -63,10 +63,10 @@ class SiloWriter {
 
         // Rertrieve the Local Grid and Local Mesh
         auto local_grid = _pm->mesh()->localGrid();
-        auto local_mesh = _pm->mesh()->localMesh();
+        auto local_mesh = *(_pm->mesh()->localMesh());
 
         // DEBUG: Trace Writing File
-        if ( DEBUG ) std::cout << "Writing File\n";
+        if ( DEBUG ) std::cerr << "Writing File\n";
 
         // Set DB Options: Time Step, Time Stamp and Delta Time
         optlist = DBMakeOptlist( 10 );
@@ -75,20 +75,21 @@ class SiloWriter {
         DBAddOption( optlist, DBOPT_DTIME, &dt );
 
         // Get Domain Space
-        auto domain = _pm->mesh()->domainSpace();
+        auto cell_domain = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
         for (int i = 0; i < Dims; i++) {
-            zdims[i] = domain.extent(i); // zones (cells) in a dimension
+            zdims[i] = cell_domain.extent(i); // zones (cells) in a dimension
             dims[i] = zdims[i] + 1; // nodes in a dimension
             spacing[i] = _pm->mesh()->cellSize();
+	    if (DEBUG) std::cerr << "Zones in Dim " << i << ": " << zdims[i] <<"\n"; 
+	    if (DEBUG) std::cerr << "Nodes in Dim " << i << ": " << dims[i] <<"\n"; 
         }
 
         // Coordinate Names: Cartesian X, Y Coordinate System
-        coordnames[0] = strdup( "x" );
-        coordnames[1] = strdup( "y" );
-        if constexpr (std::is_same_v<Dims, 3>) {
-            coordnames[2] = strdup( "z" );
-        }
+	for (int i = 0; i < Dims; i++) {
+	    const char *indexes[3] = { "x", "y", "z"};
+            coordnames[i] = strdup(indexes[i]);
+	}
 
         // Initialize Coordinate and State Arrays for Writing
 	for (int i = 0; i < Dims; i++) {
@@ -97,8 +98,10 @@ class SiloWriter {
 
         // Point Coords to arrays of coordinate values
         for ( int d = 0; d < Dims; d++) {
-            for ( int i = domain.min( d ); i <= domain.max( d ); i++ ) {
-                int     iown      = i - domain.min( d );
+	    if (DEBUG) std::cerr << "Writing coords for dim " << d << " for range "
+                                 << cell_domain.min(d) << " to " << cell_domain.max(d) << "\n";
+            for ( int i = cell_domain.min( d ); i <= cell_domain.max( d ); i++ ) {
+                int     iown      = i - cell_domain.min( d );
                 int     index[Dims]; 
                 double location[Dims];
 	        for (int i = 0; i < Dims; i++) index[i] = 0;
@@ -108,51 +111,70 @@ class SiloWriter {
             }
         }
 
-        DBPutQuadmesh( dbfile, name, (DBCAS_t)coordnames,
+        DBPutQuadmesh( dbfile, meshname, (DBCAS_t)coordnames,
                        coords, dims, Dims, DB_DOUBLE, DB_COLLINEAR, optlist );
 
-        // Get State Views
+        // Writing velocity is easy as its cell-centered.
         auto q = _pm->get( Cajita::Cell(), Field::Quantity() );
+	auto xdim = std::pair(cell_domain.min(0), cell_domain.max(0) + 1);
+	auto ydim = std::pair(cell_domain.min(1), cell_domain.max(1) + 1);
+        auto qOwned = Kokkos::subview(q, xdim, ydim, 0);
+        auto qHost = Kokkos::create_mirror_view( qOwned );
+        Kokkos::deep_copy( qHost, qOwned );
+        DBPutQuadvar1( dbfile, "quantity", meshname, qHost.data(), zdims, Dims,
+                       NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
+
+        // For velocity faces, they need to be in a single array
+	double *velocities;  
+        auto iface_domain = local_grid->indexSpace( Cajita::Own(), 
+            Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
+        auto jface_domain = local_grid->indexSpace( Cajita::Own(), 
+            Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
+	int isize = iface_domain.extent(0) * iface_domain.extent(1) * iface_domain.extent(2); 
+	int jsize = jface_domain.extent(0) * jface_domain.extent(1) * jface_domain.extent(2); 
+	velocities = (double *)malloc(sizeof(double) * (isize + jsize));
+
         auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
+	xdim = std::pair(iface_domain.min(0), iface_domain.max(0) + 1);
+	ydim = std::pair(iface_domain.min(1), iface_domain.max(1) + 1);
+        auto uOwned = Kokkos::subview(u, xdim, ydim, 0);
+        auto uHost = Kokkos::create_mirror_view( uOwned );
+        Kokkos::deep_copy( uHost, uOwned );
+	memcpy(velocities, uHost.data(), isize * sizeof(double));
+
         auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
-        auto qHost = Kokkos::create_mirror_view( q );
-        auto uHost = Kokkos::create_mirror_view( u );
-        auto vHost = Kokkos::create_mirror_view( v );
+	xdim = std::pair(jface_domain.min(0), jface_domain.max(0) + 1);
+	ydim = std::pair(jface_domain.min(1), jface_domain.max(1) + 1);
+        auto vOwned = Kokkos::subview(v, xdim, ydim, 0);
+        auto vHost = Kokkos::create_mirror_view( vOwned );
+        Kokkos::deep_copy( vHost, vOwned );
+	memcpy(velocities + isize, vHost.data(), jsize * sizeof(double));
 
-	typename pm_type::kface_array::view_type w;
-	typename pm_type::kface_array::view_type wHost;
-
-        Kokkos::deep_copy( qHost, q );
-        Kokkos::deep_copy( uHost, u );
-        Kokkos::deep_copy( vHost, v );
+	//typename pm_type::kface_array::view_type w;
+	//typename pm_type::kface_array::view_type wHost;
 	// declare w and get it if 3 dimensions
-        if constexpr (std::is_same_v<Dims, 3>) {
-            w = _pm->get( Cajita::Face<Cajita::Dim::K>(), Field::Velocity() );
-            wHost = Kokkos::create_mirror_view( w );
-        } 
+        //if constexpr (Dims == 3) {
+        //    w = _pm->get( Cajita::Face<Cajita::Dim::K>(), Field::Velocity() );
+        //    wHost = Kokkos::create_mirror_view( w );
+        //} 
 
         // Write Scalar Variables
         // Quantity
         // XXX Can't just use .data() here since that includes ghost cells and 
         // we only want owned cells. We're going to have to get an indexSpace of owned
 	// cells and create the data to write.
-        DBPutQuadvar1( dbfile, "height", name, qHost.data(), zdims, Dims,
-                       NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
 
-	    
+	
         // Velocity
-	vars[0] = uHost.data();
-        vars[1] = vHost.data();
-        varnames[0] = strdup( "u" );
-        varnames[1] = strdup( "v" );
-        if constexpr (std::is_same_v<Dims, 3>) {
-            vars[2] = wHost.data();
-            varnames[2] = strdup( "w" );
-	} 
-        DBPutQuadvar1( dbfile, "velocity", name, vars, zdims, Dims,
-                       NULL, 0, DB_DOUBLE, DB_FACECENT, optlist );
+        //if constexpr (Dims == 3) {
+        //    vars[2] = wHost.data();
+        //    varnames[2] = strdup( "w" );
+	//} 
+        DBPutQuadvar1( dbfile, "velocity", meshname, velocities, zdims, Dims,
+                       NULL, 0, DB_DOUBLE, DB_EDGECENT, optlist );
 
         // Initialize Coordinate and State Arrays for Writing
+	free(velocities);
 	for (int i = 0; i < Dims; i++) {
             free(coords[i]);
         }
@@ -168,7 +190,7 @@ class SiloWriter {
      * @param user_data File Driver/Type (PDB, HDF5)
      **/
     static void *createSiloFile( const char *filename, const char *nsname, void *user_data ) {
-        if ( DEBUG ) std::cout << "Creating file: " << filename << "\n";
+        if ( DEBUG ) std::cerr << "Creating file: " << filename << "\n";
 
         int     driver    = *( (int *)user_data );
         DBfile *silo_file = DBCreate( filename, DB_CLOBBER, DB_LOCAL, "CajitaFluidsRaw", driver );
@@ -190,6 +212,7 @@ class SiloWriter {
      **/
     static void *openSiloFile( const char *filename, const char *nsname, 
 			       PMPIO_iomode_t ioMode, void *user_data ) {
+        if ( DEBUG ) std::cerr << "SiloWriter: opening Silo file " << filename << "\n"; 
         DBfile *silo_file = DBOpen( filename, DB_UNKNOWN, ioMode == PMPIO_WRITE ? DB_APPEND : DB_READ );
 
         if ( silo_file ) {
@@ -208,6 +231,7 @@ class SiloWriter {
      * @param user_data File Driver/Type (PDB, HDF5)
      **/
     static void closeSiloFile( void *file, void *user_data ) {
+        if ( DEBUG ) std::cerr << "SiloWriter: closing Silo file.\n"; 
         DBfile *silo_file = (DBfile *)file;
         if ( silo_file ) DBClose( silo_file );
     };
@@ -232,7 +256,7 @@ class SiloWriter {
         int *block_types = (int *)malloc( size * sizeof( int ) );
         int *var_types   = (int *)malloc( size * sizeof( int ) );
 
-        DBSetDir( silo_file, "/" );
+        //DBSetDir( silo_file, "/" );
 
         for ( int i = 0; i < size; i++ ) {
             int group_rank      = PMPIO_GroupRank( baton, i );
@@ -256,7 +280,7 @@ class SiloWriter {
         DBPutMultivar( silo_file, "multi_quantity", size, q_block_names, var_types, 0 );
         DBPutMultivar( silo_file, "multi_ucomp", size, u_block_names, var_types, 0 );
         DBPutMultivar( silo_file, "multi_vcomp", size, v_block_names, var_types, 0 );
-        if constexpr (std::is_same_v<Dims, 3>) {
+        if constexpr (Dims == 3) {
             DBPutMultivar( silo_file, "multi_wcomp", size, w_block_names, var_types, 0 );
         }
         for ( int i = 0; i < size; i++ ) {
@@ -295,6 +319,8 @@ class SiloWriter {
         char           masterfilename[256], filename[256], nsname[256];
         PMPIO_baton_t *baton;
 
+        if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cerr << "SiloWriter: Initializing PMPIO.\n"; 
+
         MPI_Comm_size( MPI_COMM_WORLD, &size );
         MPI_Bcast( &numGroups, 1, MPI_INT, 0, MPI_COMM_WORLD );
         MPI_Bcast( &driver, 1, MPI_INT, 0, MPI_COMM_WORLD );
@@ -309,18 +335,23 @@ class SiloWriter {
         // Show Errors and Force FLoating Point
         DBShowErrors( DB_ALL, NULL );
 
+        if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cerr << "SiloWriter: Waiting for PMPIO file baton.\n"; 
         silo_file = (DBfile *)PMPIO_WaitForBaton( baton, filename, nsname );
 
+        if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cerr << "SiloWriter: Writing to silo file.\n"; 
         writeFile( silo_file, name, time_step, time, dt );
 
         if ( _pm->mesh()->rank() == 0 ) {
+            if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cerr << "SiloWriter: Rank 0 creating master file.\n"; 
             master_file = DBCreate( masterfilename, DB_CLOBBER, DB_LOCAL, "CajitaFluids", driver );
             writeMultiObjects( master_file, baton, size, time_step, "pdb" );
             DBClose( master_file );
         }
 
+        if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cerr << "SiloWriter: Handing off PMPIO baton.\n"; 
         PMPIO_HandOffBaton( baton, silo_file );
 
+        if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cerr << "SiloWriter: Calling PMPIO_Finish.\n"; 
         PMPIO_Finish( baton );
     }
 

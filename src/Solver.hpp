@@ -111,15 +111,16 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
     {
 	int t = 0;
         double time = 0.0;
-	int num_step = 0;
-
+        int num_step;
 #if 1
-        _silo->siloWrite( strdup( "Mesh" ), num_step, time, _dt );
+        _silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
 #endif
+	num_step = t_final / _dt;
+
         while ( (time < t_final) ) 
         {
             if ( 0 == _mesh->rank() && 0 == t % write_freq )
-                printf( "Step %d / %d at time = %f\n", t + 1, num_step, time );
+                printf( "Step %d / %d at time = %f\n", t, num_step, time );
 
 	    // 1. Handle inflow and body forces.
 	    addExternalInputs();
@@ -148,10 +149,9 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 #if 1
 	    // 4. Output mesh state periodically
             if ( 0 == t % write_freq ) {
-                _silo->siloWrite( strdup( "Mesh" ), num_step, time, _dt );
+                _silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
 	    }
 #endif
-
             time += _dt;
             t++;
         }
