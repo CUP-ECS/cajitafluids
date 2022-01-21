@@ -64,12 +64,16 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     using memory_space = MemorySpace;
     using execution_space = ExecutionSpace;
     using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
+    using cell_array = Cajita::Array<double, Cajita::Cell,
+                                     Cajita::UniformMesh<double, 2>, MemorySpace>;
     using iface_array = Cajita::Array<double, Cajita::Face<Cajita::Dim::I>,
                                       Cajita::UniformMesh<double, 2>, MemorySpace>;
     using jface_array = Cajita::Array<double, Cajita::Face<Cajita::Dim::J>,
                                       Cajita::UniformMesh<double, 2>, MemorySpace>;
-    using cell_array = Cajita::Array<double, Cajita::Cell,
-                                     Cajita::UniformMesh<double, 2>, MemorySpace>;
+
+    // Meaningless type for now until we have 3D support in.
+    using kface_array = Cajita::Array<double, Cajita::Face<Cajita::Dim::K>,
+                                      Cajita::UniformMesh<double, 2>, MemorySpace>;
     using halo = Cajita::Halo<MemorySpace>;
 
     using mesh_type = Mesh<2, ExecutionSpace, MemorySpace>;
