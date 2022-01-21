@@ -11,7 +11,7 @@
 #define CAJITAFLUIDS_SILOWRITER_HPP
 
 #ifndef DEBUG
-#define DEBUG 1
+#define DEBUG 0
 #endif
 
 // Include Statements
@@ -81,8 +81,6 @@ class SiloWriter {
             zdims[i] = cell_domain.extent(i); // zones (cells) in a dimension
             dims[i] = zdims[i] + 1; // nodes in a dimension
             spacing[i] = _pm->mesh()->cellSize();
-	    if (DEBUG) std::cerr << "Zones in Dim " << i << ": " << zdims[i] <<"\n"; 
-	    if (DEBUG) std::cerr << "Nodes in Dim " << i << ": " << dims[i] <<"\n"; 
         }
 
         // Coordinate Names: Cartesian X, Y Coordinate System
@@ -111,6 +109,7 @@ class SiloWriter {
             }
         }
 
+        if ( DEBUG ) std::cerr << "Writing quadmesh setup\n";
         DBPutQuadmesh( dbfile, meshname, (DBCAS_t)coordnames,
                        coords, dims, Dims, DB_DOUBLE, DB_COLLINEAR, optlist );
 
@@ -121,6 +120,7 @@ class SiloWriter {
         auto qOwned = Kokkos::subview(q, xdim, ydim, 0);
         auto qHost = Kokkos::create_mirror_view( qOwned );
         Kokkos::deep_copy( qHost, qOwned );
+        if ( DEBUG ) std::cerr << "Writing quantity variable\n";
         DBPutQuadvar1( dbfile, "quantity", meshname, qHost.data(), zdims, Dims,
                        NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
 
@@ -130,24 +130,29 @@ class SiloWriter {
             Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
         auto jface_domain = local_grid->indexSpace( Cajita::Own(), 
             Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
-	int isize = iface_domain.extent(0) * iface_domain.extent(1) * iface_domain.extent(2); 
-	int jsize = jface_domain.extent(0) * jface_domain.extent(1) * jface_domain.extent(2); 
+        
+	int isize = iface_domain.extent(0) * iface_domain.extent(1); // * iface_domain.extent(2); 
+	int jsize = jface_domain.extent(0) * jface_domain.extent(1);// * jface_domain.extent(2); 
 	velocities = (double *)malloc(sizeof(double) * (isize + jsize));
 
+        if ( DEBUG ) std::cerr << "Working on u velocity variable of size " << isize << "\n";
         auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
 	xdim = std::pair(iface_domain.min(0), iface_domain.max(0) + 1);
 	ydim = std::pair(iface_domain.min(1), iface_domain.max(1) + 1);
         auto uOwned = Kokkos::subview(u, xdim, ydim, 0);
         auto uHost = Kokkos::create_mirror_view( uOwned );
         Kokkos::deep_copy( uHost, uOwned );
+        if ( DEBUG ) std::cerr << "Copying in u velocity variable\n";
 	memcpy(velocities, uHost.data(), isize * sizeof(double));
 
+        if ( DEBUG ) std::cerr << "Working on v velocity variable of size " << jsize << "\n";
         auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
 	xdim = std::pair(jface_domain.min(0), jface_domain.max(0) + 1);
 	ydim = std::pair(jface_domain.min(1), jface_domain.max(1) + 1);
         auto vOwned = Kokkos::subview(v, xdim, ydim, 0);
         auto vHost = Kokkos::create_mirror_view( vOwned );
         Kokkos::deep_copy( vHost, vOwned );
+        if ( DEBUG ) std::cerr << "Copying in v velocity variable\n";
 	memcpy(velocities + isize, vHost.data(), jsize * sizeof(double));
 
 	//typename pm_type::kface_array::view_type w;
@@ -170,6 +175,7 @@ class SiloWriter {
         //    vars[2] = wHost.data();
         //    varnames[2] = strdup( "w" );
 	//} 
+        if ( DEBUG ) std::cerr << "Writing in u and v velocity variables\n";
         DBPutQuadvar1( dbfile, "velocity", meshname, velocities, zdims, Dims,
                        NULL, 0, DB_DOUBLE, DB_EDGECENT, optlist );
 
@@ -181,6 +187,7 @@ class SiloWriter {
 
         // Free Option List
         DBFreeOptlist( optlist );
+        if ( DEBUG ) std::cerr << "Finished writing variables to file\n";
     };
 
     /**
