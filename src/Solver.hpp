@@ -20,9 +20,8 @@
 #include <BoundaryConditions.hpp>
 #include <InflowSource.hpp>
 #include <BodyForce.hpp>
-
-//#include <ExaMPM_SiloParticleWriter.hpp>
-//#include <ExaMPM_TimeIntegrator.hpp>
+#include <SiloWriter.hpp>
+//#include <TimeIntegrator.hpp>
 
 #include <Kokkos_Core.hpp>
 #include <memory>
@@ -79,6 +78,8 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 
         _pm = std::make_shared<ProblemManager<2, ExecutionSpace, MemorySpace>>(
             ExecutionSpace(), _mesh, create_functor );
+        // Set up Silo for I/O
+        _silo = std::make_shared<SiloWriter<2, ExecutionSpace, MemorySpace>>( _pm );
 
         auto vector_layout =
             Cajita::createArrayLayout( _mesh->localGrid(), 1, Cell() );
@@ -103,20 +104,18 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	_pressure_solver->setPrintLevel( 1 );
 	// We could create a preconditioner here if we wanted, but we are lazy.
 	_pressure_solver->setup();
+
     }
 
     void solve( const double t_final, const int write_freq ) override
     {
-#if 0
-        SiloParticleWriter::writeTimeStep(
-            _mesh->localGrid()->globalGrid(), 0, 0.0,
-            _pm->get( Location::Particle(), Field::Position() ),
-            _pm->get( Location::Particle(), Field::Velocity() ),
-            _pm->get( Location::Particle(), Field::J() ) );
-#endif
 	int t = 0;
         double time = 0.0;
 	int num_step = 0;
+
+#if 1
+        _silo->siloWrite( strdup( "Mesh" ), num_step, time, _dt );
+#endif
         while ( (time < t_final) ) 
         {
             if ( 0 == _mesh->rank() && 0 == t % write_freq )
@@ -146,14 +145,11 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
             //TimeIntegrator::step( ExecutionSpace(), *_pm, _dt, _bc );
 #endif
 
-#if 0
+#if 1
 	    // 4. Output mesh state periodically
-            if ( 0 == t % write_freq )
-                SiloParticleWriter::writeTimeStep(
-                    _mesh->localGrid()->globalGrid(), t + 1, time,
-                    _pm->get( Location::Particle(), Field::Position() ),
-                    _pm->get( Location::Particle(), Field::Velocity() ),
-                    _pm->get( Location::Particle(), Field::J() ) );
+            if ( 0 == t % write_freq ) {
+                _silo->siloWrite( strdup( "Mesh" ), num_step, time, _dt );
+	    }
 #endif
 
             time += _dt;
@@ -266,6 +262,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
     int _halo_min;
     std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
     std::shared_ptr<ProblemManager<2, ExecutionSpace, MemorySpace>> _pm;
+    std::shared_ptr<SiloWriter<2, ExecutionSpace, MemorySpace>> _silo;
     std::shared_ptr<cell_array> _lhs;
     std::shared_ptr<cell_array> _rhs;
     std::shared_ptr<solver_type> _pressure_solver;

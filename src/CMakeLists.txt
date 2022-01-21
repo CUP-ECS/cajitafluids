@@ -4,6 +4,7 @@ set(HEADERS
   InflowSource.hpp
   Mesh.hpp
   ProblemManager.hpp
+  SiloWriter.hpp
   Solver.hpp
   )
 
