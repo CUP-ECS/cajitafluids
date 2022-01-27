@@ -34,9 +34,12 @@ template <> struct InflowSource<2> {
             /* Check if we're inside the bounding box for the inflow XXX */
 	    if (x >= _bounding_box[0] && x < _bounding_box[2] 
 		&& y >= _bounding_box[1] && y < _bounding_box[3]) {
-		/* THis should really be a *rate* of inflow, but we're forcing a quantity at
-		 * the location to start match the formulation of the original incremental
-		 * fluids solver */
+		/* This should really be a *rate* of inflow, and it should be
+		 * interpolated across the volume of intersecting cells, but
+		 * we're forcing a quantity at the location to start to match 
+		 * the formulation of the original incremental fluids solver */
+                /* XXX incremental-fluids does an absolute value in the 
+                 * comparison - why? XXX */
 		if ( q(i, j, 0) < _quantity ) q(i, j, 0) = _quantity;
 	    }
         }

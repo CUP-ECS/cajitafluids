@@ -10,9 +10,9 @@
 #ifndef CAJITAFLUIDS_SILOWRITER_HPP
 #define CAJITAFLUIDS_SILOWRITER_HPP
 
-#ifndef DEBUG
-#define DEBUG 0
-#endif
+//#ifndef DEBUG
+#define DEBUG 1
+//#endif
 
 // Include Statements
 #include <Cajita.hpp>
@@ -51,21 +51,19 @@ class SiloWriter {
      * @param time_step Current time step
      * @param time Current tim
      * @param dt Time Step (dt)
+     * @brief Writes the locally-owned portion of the mesh/variables to a file
      **/
     void writeFile( DBfile *dbfile, char *meshname, int time_step, double time, double dt ) {
         // Initialize Variables
         int        dims[Dims], zdims[Dims];
         double    *coords[Dims], *vars[Dims], spacing[Dims];
-        char *     coordnames[Dims], *varnames[Dims];
+	const char *coordnames[3] = { "X", "Y", "Z"};
         DBoptlist *optlist;
-
-        // Define device_type for Later Use
 
         // Rertrieve the Local Grid and Local Mesh
         auto local_grid = _pm->mesh()->localGrid();
         auto local_mesh = *(_pm->mesh()->localMesh());
 
-        // DEBUG: Trace Writing File
         if ( DEBUG ) std::cerr << "Writing File\n";
 
         // Set DB Options: Time Step, Time Stamp and Delta Time
@@ -74,112 +72,127 @@ class SiloWriter {
         DBAddOption( optlist, DBOPT_TIME, &time );
         DBAddOption( optlist, DBOPT_DTIME, &dt );
 
-        // Get Domain Space
+        // Get the size of the local cell space and declare the 
+	// coordinates of the portion of the mesh we're writing
         auto cell_domain = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
         for (int i = 0; i < Dims; i++) {
             zdims[i] = cell_domain.extent(i); // zones (cells) in a dimension
             dims[i] = zdims[i] + 1; // nodes in a dimension
-            spacing[i] = _pm->mesh()->cellSize();
+            spacing[i] = _pm->mesh()->cellSize(); // uniform mesh
         }
 
-        // Coordinate Names: Cartesian X, Y Coordinate System
+        // Coordinate Names: Cartesian X/Y/Z Coordinate System
 	for (int i = 0; i < Dims; i++) {
-	    const char *indexes[3] = { "x", "y", "z"};
-            coordnames[i] = strdup(indexes[i]);
 	}
 
-        // Initialize Coordinate and State Arrays for Writing
+        // Allocate coordinate arrays in each dimension
 	for (int i = 0; i < Dims; i++) {
             coords[i] = (double *)malloc(sizeof(double) * dims[i]);
         }
 
-        // Point Coords to arrays of coordinate values
+        // Fill out coords[] arrays with coordinate values in each dimension
         for ( int d = 0; d < Dims; d++) {
 	    if (DEBUG) std::cerr << "Writing coords for dim " << d << " for range "
                                  << cell_domain.min(d) << " to " << cell_domain.max(d) << "\n";
-            for ( int i = cell_domain.min( d ); i <= cell_domain.max( d ); i++ ) {
+            for ( int i = cell_domain.min( d ); 
+		      i < cell_domain.max( d ) + 1; i++ ) {
                 int     iown      = i - cell_domain.min( d );
                 int     index[Dims]; 
                 double location[Dims];
-	        for (int i = 0; i < Dims; i++) index[i] = 0;
+	        for (int j = 0; j < Dims; j++) index[j] = 0;
 	        index[d] = i;
                 local_mesh.coordinates( Cajita::Node(), index, location );
                 coords[d][iown] = location[d];
             }
         }
 
-        if ( DEBUG ) std::cerr << "Writing quadmesh setup\n";
+        if ( DEBUG ) std::cerr << "Writing quadmesh description\n";
         DBPutQuadmesh( dbfile, meshname, (DBCAS_t)coordnames,
                        coords, dims, Dims, DB_DOUBLE, DB_COLLINEAR, optlist );
 
-        // Writing velocity is easy as its cell-centered.
+	// Now we write the individual variables assocuated with this 
+	// portion of the mesh, potentially copying them out of device space
+ 	// and making sure not to write ghost values.
+
+        // Advected quantity first - copy owned portion from the primary 
+        // execution space to the host execution space
         auto q = _pm->get( Cajita::Cell(), Field::Quantity() );
-	auto xdim = std::pair(cell_domain.min(0), cell_domain.max(0) + 1);
-	auto ydim = std::pair(cell_domain.min(1), cell_domain.max(1) + 1);
-        auto qOwned = Kokkos::subview(q, xdim, ydim, 0);
-        auto qHost = Kokkos::create_mirror_view( qOwned );
-        Kokkos::deep_copy( qHost, qOwned );
+	auto xmin = cell_domain.min(0);
+	auto ymin = cell_domain.min(1);
+        Kokkos::View<typename pm_type::cell_array::value_type***, Kokkos::LayoutLeft,
+		     typename pm_type::cell_array::device_type> 
+            qOwned("qowned", cell_domain.extent(0), cell_domain.extent(1), 1);
+	Kokkos::parallel_for( 
+            "SiloWriter::qowned copy", 
+            createExecutionPolicy( cell_domain, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
+	        qOwned(i - xmin, j - ymin, 0) = q(i, j, 0);
+            });
+        auto qHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), qOwned );
+
         if ( DEBUG ) std::cerr << "Writing quantity variable\n";
         DBPutQuadvar1( dbfile, "quantity", meshname, qHost.data(), zdims, Dims,
                        NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
 
-        // For velocity faces, they need to be in a single array
-	double *velocities;  
-        auto iface_domain = local_grid->indexSpace( Cajita::Own(), 
-            Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
+        // Velocity faces need to be in a single array, ordered by i then j
+	// edges. i-faces in 2D are j-oriented edges, so we do v then u. In 
+        // addition, each subportion of this array is also padded out to be 
+	// dim[0] by dim[1] in size for Silo.
+        
+	double *velocities = (double *)malloc(sizeof(double) * dims[0] * dims[1] * Dims );
+
+	// Copy the v velocity face values to a row-major view on the 
+	// host and then into the array. Note that we have to pad this out
+	// to be dims[0] * dims[1] in size.
+        if ( DEBUG ) std::cerr << "Working on v velocity variable.\n";
+        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
+        Kokkos::View<typename pm_type::jface_array::value_type***, Kokkos::LayoutLeft,
+		     typename pm_type::jface_array::device_type> 
+            vOwned("vowned", dims[0], dims[1], 1);
         auto jface_domain = local_grid->indexSpace( Cajita::Own(), 
             Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
-        
-	int isize = iface_domain.extent(0) * iface_domain.extent(1); // * iface_domain.extent(2); 
-	int jsize = jface_domain.extent(0) * jface_domain.extent(1);// * jface_domain.extent(2); 
-	velocities = (double *)malloc(sizeof(double) * (isize + jsize));
-
-        if ( DEBUG ) std::cerr << "Working on u velocity variable of size " << isize << "\n";
-        auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
-	xdim = std::pair(iface_domain.min(0), iface_domain.max(0) + 1);
-	ydim = std::pair(iface_domain.min(1), iface_domain.max(1) + 1);
-        auto uOwned = Kokkos::subview(u, xdim, ydim, 0);
-        auto uHost = Kokkos::create_mirror_view( uOwned );
-        Kokkos::deep_copy( uHost, uOwned );
-        if ( DEBUG ) std::cerr << "Copying in u velocity variable\n";
-	memcpy(velocities, uHost.data(), isize * sizeof(double));
-
-        if ( DEBUG ) std::cerr << "Working on v velocity variable of size " << jsize << "\n";
-        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
-	xdim = std::pair(jface_domain.min(0), jface_domain.max(0) + 1);
-	ydim = std::pair(jface_domain.min(1), jface_domain.max(1) + 1);
-        auto vOwned = Kokkos::subview(v, xdim, ydim, 0);
-        auto vHost = Kokkos::create_mirror_view( vOwned );
-        Kokkos::deep_copy( vHost, vOwned );
+	Kokkos::parallel_for( 
+            "SiloWriter::vowned copy", 
+            createExecutionPolicy( jface_domain, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
+	        vOwned(i - xmin, j - ymin, 0) = v(i, j, 0);
+            });
+        auto vHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
+                                                          vOwned );
         if ( DEBUG ) std::cerr << "Copying in v velocity variable\n";
-	memcpy(velocities + isize, vHost.data(), jsize * sizeof(double));
+	memcpy(velocities, vHost.data(), dims[0] * dims[1] * sizeof(double));
 
-	//typename pm_type::kface_array::view_type w;
-	//typename pm_type::kface_array::view_type wHost;
-	// declare w and get it if 3 dimensions
-        //if constexpr (Dims == 3) {
-        //    w = _pm->get( Cajita::Face<Cajita::Dim::K>(), Field::Velocity() );
-        //    wHost = Kokkos::create_mirror_view( w );
-        //} 
+	// Now move the v velocity faces to the array the same way.
+        if ( DEBUG ) std::cerr << "Working on u velocity variable.\n";
+        auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
 
-        // Write Scalar Variables
-        // Quantity
-        // XXX Can't just use .data() here since that includes ghost cells and 
-        // we only want owned cells. We're going to have to get an indexSpace of owned
-	// cells and create the data to write.
+	// The view is size dims[0] by dims[1] but the parallel loop to
+	// copy into it iterates over the space of edge indicies
+        Kokkos::View<typename pm_type::iface_array::value_type***, Kokkos::LayoutLeft,
+		     typename pm_type::iface_array::device_type> 
+            uOwned("uowned", dims[0], dims[1], 1);
+        auto iface_domain = local_grid->indexSpace( Cajita::Own(), 
+            Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
+	Kokkos::parallel_for( 
+            "SiloWriter::uowned copy", 
+            createExecutionPolicy( iface_domain, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
+	        uOwned(i - xmin, j - ymin, 0) = u(i, j, 0);
+            });
+        auto uHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
+							  uOwned);
+        if ( DEBUG ) std::cerr << "Copying in u velocity variable\n";
+	memcpy(velocities + dims[0] * dims[1], uHost.data(), 
+               dims[0] * dims[1] * sizeof(double));
 
-	
-        // Velocity
-        //if constexpr (Dims == 3) {
-        //    vars[2] = wHost.data();
-        //    varnames[2] = strdup( "w" );
-	//} 
-        if ( DEBUG ) std::cerr << "Writing in u and v velocity variables\n";
-        DBPutQuadvar1( dbfile, "velocity", meshname, velocities, zdims, Dims,
+	// Finally write the velocity faces to the output file. Again, this is 
+        // true edge-centered data, so it wants the number of nodes, not zones.
+        if ( DEBUG ) std::cerr << "Writing velocity variable to silo quadmesh\n";
+        DBPutQuadvar1( dbfile, "velocity", meshname, velocities, dims, Dims,
                        NULL, 0, DB_DOUBLE, DB_EDGECENT, optlist );
 
-        // Initialize Coordinate and State Arrays for Writing
+        // Free Coordinate and State Arrays for Writing
 	free(velocities);
 	for (int i = 0; i < Dims; i++) {
             free(coords[i]);
@@ -244,8 +257,9 @@ class SiloWriter {
     };
 
     /**
-     * Write Multi Object Silo File the References Child Files in order to have entire set of data for the time step within a Single File
-     * Combines several Silo Files into a Single Silo File
+     * Write Multi Object Silo File the References Child Files in order to 
+     * have entire set of data for the time step writen by each rank in
+     * a single logical file
      * 
      * @param silo_file Pointer to the Silo File
      * @param baton Baton object from PMPIO
@@ -256,53 +270,38 @@ class SiloWriter {
     void writeMultiObjects( DBfile *silo_file, PMPIO_baton_t *baton, int size, int time_step, const char *file_ext ) {
         char **mesh_block_names = (char **)malloc( size * sizeof( char * ) );
         char **q_block_names    = (char **)malloc( size * sizeof( char * ) );
-        char **u_block_names    = (char **)malloc( size * sizeof( char * ) );
         char **v_block_names    = (char **)malloc( size * sizeof( char * ) );
-        char **w_block_names    = (char **)malloc( size * sizeof( char * ) );
 
         int *block_types = (int *)malloc( size * sizeof( int ) );
         int *var_types   = (int *)malloc( size * sizeof( int ) );
 
-        //DBSetDir( silo_file, "/" );
+        DBSetDir( silo_file, "/" );
 
         for ( int i = 0; i < size; i++ ) {
             int group_rank      = PMPIO_GroupRank( baton, i );
             mesh_block_names[i] = (char *)malloc( 1024 );
             q_block_names[i]    = (char *)malloc( 1024 );
-            u_block_names[i]    = (char *)malloc( 1024 );
             v_block_names[i]    = (char *)malloc( 1024 );
-            w_block_names[i]    = (char *)malloc( 1024 );
 
             sprintf( mesh_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/Mesh", group_rank, time_step, i );
             sprintf( q_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/quantity", group_rank, time_step, i );
-            sprintf( u_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/ucomp", group_rank, time_step, i );
-            sprintf( v_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/vcomp", group_rank, time_step, i );
-            sprintf( w_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/wcomp", group_rank, time_step, i );
-
+            sprintf( v_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/velocity", group_rank, time_step, i );
             block_types[i] = DB_QUADMESH;
             var_types[i]   = DB_QUADVAR;
         }
 
         DBPutMultimesh( silo_file, "multi_mesh", size, mesh_block_names, block_types, 0 );
         DBPutMultivar( silo_file, "multi_quantity", size, q_block_names, var_types, 0 );
-        DBPutMultivar( silo_file, "multi_ucomp", size, u_block_names, var_types, 0 );
-        DBPutMultivar( silo_file, "multi_vcomp", size, v_block_names, var_types, 0 );
-        if constexpr (Dims == 3) {
-            DBPutMultivar( silo_file, "multi_wcomp", size, w_block_names, var_types, 0 );
-        }
+        DBPutMultivar( silo_file, "multi_velocity", size, v_block_names, var_types, 0 );
         for ( int i = 0; i < size; i++ ) {
             free( mesh_block_names[i] );
             free( q_block_names[i] );
-            free( u_block_names[i] );
             free( v_block_names[i] );
-            free( w_block_names[i] );
         }
 
         free( mesh_block_names );
         free( q_block_names );
-        free( u_block_names );
         free( v_block_names );
-        free( w_block_names );
         free( block_types );
         free( var_types );
     }
