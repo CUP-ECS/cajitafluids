@@ -118,7 +118,7 @@ void usage( const int rank, char *progname ) {
  */
 int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
     cl.device = "serial";              // Default Thread Setting
-    cl.t_final = 4.0;   
+    cl.t_final = 0.1;   
     cl.delta_t = 0.005;  
     cl.write_freq = 20;  
     cl.global_num_cells    = { 128, 128 };
