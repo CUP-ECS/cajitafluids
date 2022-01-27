@@ -113,13 +113,22 @@ class SiloWriter {
         DBPutQuadmesh( dbfile, meshname, (DBCAS_t)coordnames,
                        coords, dims, Dims, DB_DOUBLE, DB_COLLINEAR, optlist );
 
-        // Writing velocity is easy as its cell-centered.
+        // Copy owned portion of the quantity from the primary 
+        // execution space to the host execution space
         auto q = _pm->get( Cajita::Cell(), Field::Quantity() );
-	auto xdim = std::pair(cell_domain.min(0), cell_domain.max(0) + 1);
-	auto ydim = std::pair(cell_domain.min(1), cell_domain.max(1) + 1);
-        auto qOwned = Kokkos::subview(q, xdim, ydim, 0);
-        auto qHost = Kokkos::create_mirror_view( qOwned );
-        Kokkos::deep_copy( qHost, qOwned );
+	auto xmin = cell_domain.min(0);
+	auto ymin = cell_domain.min(1);
+        Kokkos::View<typename pm_type::cell_array::value_type***, Kokkos::LayoutLeft,
+		     typename pm_type::cell_array::device_type> 
+            qOwned("qowned", cell_domain.extent(0), cell_domain.extent(1), 1);
+	Kokkos::parallel_for( 
+            "SiloWriter::qowned copy", 
+            createExecutionPolicy( cell_domain, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
+	        qOwned(i - xmin, j - ymin, 0) = q(i, j, 0);
+            });
+        auto qHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), qOwned );
+
         if ( DEBUG ) std::cerr << "Writing quantity variable\n";
         DBPutQuadvar1( dbfile, "quantity", meshname, qHost.data(), zdims, Dims,
                        NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
@@ -137,8 +146,8 @@ class SiloWriter {
 
         if ( DEBUG ) std::cerr << "Working on u velocity variable of size " << isize << "\n";
         auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
-	xdim = std::pair(iface_domain.min(0), iface_domain.max(0) + 1);
-	ydim = std::pair(iface_domain.min(1), iface_domain.max(1) + 1);
+	auto xdim = std::pair(iface_domain.min(0), iface_domain.max(0) + 1);
+	auto ydim = std::pair(iface_domain.min(1), iface_domain.max(1) + 1);
         auto uOwned = Kokkos::subview(u, xdim, ydim, 0);
         auto uHost = Kokkos::create_mirror_view( uOwned );
         Kokkos::deep_copy( uHost, uOwned );
