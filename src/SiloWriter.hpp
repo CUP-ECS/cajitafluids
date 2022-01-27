@@ -57,7 +57,7 @@ class SiloWriter {
         // Initialize Variables
         int        dims[Dims], zdims[Dims];
         double    *coords[Dims], *vars[Dims], spacing[Dims];
-        char *     coordnames[Dims], *varnames[Dims];
+	const char *coordnames[3] = { "X", "Y", "Z"};
         DBoptlist *optlist;
 
         // Rertrieve the Local Grid and Local Mesh
@@ -74,7 +74,7 @@ class SiloWriter {
 
         // Get the size of the local cell space and declare the 
 	// coordinates of the portion of the mesh we're writing
-        tuto cell_domain = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
+        auto cell_domain = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
         for (int i = 0; i < Dims; i++) {
             zdims[i] = cell_domain.extent(i); // zones (cells) in a dimension
@@ -84,8 +84,6 @@ class SiloWriter {
 
         // Coordinate Names: Cartesian X/Y/Z Coordinate System
 	for (int i = 0; i < Dims; i++) {
-	    const char *indexes[3] = { "X", "Y", "Z"};
-            coordnames[i] = strdup(indexes[i]);
 	}
 
         // Allocate coordinate arrays in each dimension
@@ -138,14 +136,34 @@ class SiloWriter {
                        NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
 
         // Velocity faces need to be in a single array, ordered by i then j
-	// edges. Each subportion of this array is also padded out to be 
+	// edges. i-faces in 2D are j-oriented edges, so we do v then u. In 
+        // addition, each subportion of this array is also padded out to be 
 	// dim[0] by dim[1] in size for Silo.
         
 	double *velocities = (double *)malloc(sizeof(double) * dims[0] * dims[1] * Dims );
 
-	// Now copy the u velocity face values to a row-major view on the 
+	// Copy the v velocity face values to a row-major view on the 
 	// host and then into the array. Note that we have to pad this out
 	// to be dims[0] * dims[1] in size.
+        if ( DEBUG ) std::cerr << "Working on v velocity variable.\n";
+        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
+        Kokkos::View<typename pm_type::jface_array::value_type***, Kokkos::LayoutLeft,
+		     typename pm_type::jface_array::device_type> 
+            vOwned("vowned", dims[0], dims[1], 1);
+        auto jface_domain = local_grid->indexSpace( Cajita::Own(), 
+            Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
+	Kokkos::parallel_for( 
+            "SiloWriter::vowned copy", 
+            createExecutionPolicy( jface_domain, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
+	        vOwned(i - xmin, j - ymin, 0) = v(i, j, 0);
+            });
+        auto vHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
+                                                          vOwned );
+        if ( DEBUG ) std::cerr << "Copying in v velocity variable\n";
+	memcpy(velocities, vHost.data(), dims[0] * dims[1] * sizeof(double));
+
+	// Now move the v velocity faces to the array the same way.
         if ( DEBUG ) std::cerr << "Working on u velocity variable.\n";
         auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
 
@@ -165,32 +183,12 @@ class SiloWriter {
         auto uHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
 							  uOwned);
         if ( DEBUG ) std::cerr << "Copying in u velocity variable\n";
-	memcpy(velocities, uHost.data(), dims[0] * dims[1] * sizeof(double));
-
-	// Now move the v velocity faces to the array the same way.
-        if ( DEBUG ) std::cerr << "Working on v velocity variable.\n";
-        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
-        Kokkos::View<typename pm_type::jface_array::value_type***, Kokkos::LayoutLeft,
-		     typename pm_type::jface_array::device_type> 
-            vOwned("vowned", dims[0], dims[1], 1);
-        auto jface_domain = local_grid->indexSpace( Cajita::Own(), 
-            Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
-	Kokkos::parallel_for( 
-            "SiloWriter::vowned copy", 
-            createExecutionPolicy( jface_domain, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
-	        vOwned(i - xmin, j - ymin, 0) = v(i, j, 0);
-            });
-        auto vHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
-                                                          vOwned );
-
-        if ( DEBUG ) std::cerr << "Copying in v velocity variable\n";
-	memcpy(velocities + dims[0] * dims[1], vHost.data(), 
+	memcpy(velocities + dims[0] * dims[1], uHost.data(), 
                dims[0] * dims[1] * sizeof(double));
 
 	// Finally write the velocity faces to the output file. Again, this is 
         // true edge-centered data, so it wants the number of nodes, not zones.
-        if ( DEBUG ) std::cerr << "Writing in velocity variables\n";
+        if ( DEBUG ) std::cerr << "Writing velocity variable to silo quadmesh\n";
         DBPutQuadvar1( dbfile, "velocity", meshname, velocities, dims, Dims,
                        NULL, 0, DB_DOUBLE, DB_EDGECENT, optlist );
 
