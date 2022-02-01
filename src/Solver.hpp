@@ -256,7 +256,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 
 		int gi, gj;
                 l2g(i, j, gi, gj); 
-		_bc.apply_pressure(gi, gj, i, j, p, u, v, scale);
+		_bc.apply_pressure(gi, gj, i, j, u, v, scale);
             });
     }
 
