@@ -261,7 +261,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * Scatter State Data to Neighbors
      * @param Location::Face<Dim::I>
      **/
-    void scatter( Cajita::Face<Cajita::Dim::I> ) const {
+    void scatter( Cajita::Face<Cajita::Dim::I>, Field::Velocity ) const {
         _iface_halo->scatter( ExecutionSpace(), *_ui);
     };
 
@@ -269,7 +269,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * Scatter State Data to Neighbors
      * @param Location::Face<Dim::J>
      **/
-    void scatter( Cajita::Face<Cajita::Dim::J> ) const {
+    void scatter( Cajita::Face<Cajita::Dim::J>, Field::Velocity ) const {
         _jface_halo->scatter( ExecutionSpace(), *_uj);
     };
 
@@ -281,10 +281,10 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     void gather( Cajita::Cell, Field::Quantity ) const {
         _cell_halo->gather( ExecutionSpace(), *_quantity );
     };
-    void gather( Cajita::Face<Cajita::Dim::I> ) const {
+    void gather( Cajita::Face<Cajita::Dim::I>, Field::Velocity ) const {
         _iface_halo->gather( ExecutionSpace(), *_ui);
     };
-    void gather( Cajita::Face<Cajita::Dim::J> ) const {
+    void gather( Cajita::Face<Cajita::Dim::J>, Field::Velocity ) const {
         _jface_halo->gather( ExecutionSpace(), *_uj);
     };
 
