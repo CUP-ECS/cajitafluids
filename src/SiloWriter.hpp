@@ -10,9 +10,9 @@
 #ifndef CAJITAFLUIDS_SILOWRITER_HPP
 #define CAJITAFLUIDS_SILOWRITER_HPP
 
-//#ifndef DEBUG
-#define DEBUG 1
-//#endif
+#ifndef DEBUG
+#define DEBUG 0
+#endif
 
 // Include Statements
 #include <Cajita.hpp>
@@ -135,6 +135,9 @@ class SiloWriter {
         DBPutQuadvar1( dbfile, "quantity", meshname, qHost.data(), zdims, Dims,
                        NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
 
+        auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
+        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
+#ifdef EDGE_VOLICITY_IO
         // Velocity faces need to be in a single array, ordered by i then j
 	// edges. i-faces in 2D are j-oriented edges, so we do v then u. In 
         // addition, each subportion of this array is also padded out to be 
@@ -146,7 +149,6 @@ class SiloWriter {
 	// host and then into the array. Note that we have to pad this out
 	// to be dims[0] * dims[1] in size.
         if ( DEBUG ) std::cerr << "Working on v velocity variable.\n";
-        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
         Kokkos::View<typename pm_type::jface_array::value_type***, Kokkos::LayoutLeft,
 		     typename pm_type::jface_array::device_type> 
             vOwned("vowned", dims[0], dims[1], 1);
@@ -165,7 +167,6 @@ class SiloWriter {
 
 	// Now move the v velocity faces to the array the same way.
         if ( DEBUG ) std::cerr << "Working on u velocity variable.\n";
-        auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
 
 	// The view is size dims[0] by dims[1] but the parallel loop to
 	// copy into it iterates over the space of edge indicies
@@ -194,6 +195,32 @@ class SiloWriter {
 
         // Free Coordinate and State Arrays for Writing
 	free(velocities);
+#else
+	/* Because VisIt can't currently show edge velocity magnitudes, we instead interpolate
+	 * to cell-centered velcity vectors for I/O */
+
+	Kokkos::View<typename pm_type::cell_array::value_type***, Kokkos::LayoutLeft,
+                     typename pm_type::cell_array::device_type>
+            uOwned("uOwned", cell_domain.extent(0), cell_domain.extent(1), 1);
+	Kokkos::View<typename pm_type::cell_array::value_type***, Kokkos::LayoutLeft,
+                     typename pm_type::cell_array::device_type>
+            vOwned("vOwned", cell_domain.extent(0), cell_domain.extent(1), 1);
+        Kokkos::parallel_for(
+            "SiloWriter::qowned copy",
+            createExecutionPolicy( cell_domain, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
+                uOwned(i - xmin, j - ymin, 0) = (u(i, j, 0) + u(i + 1, j, 0)) / 2;
+                vOwned(i - xmin, j - ymin, 0) = (v(i, j, 0) + v(i, j + 1, 0)) / 2;
+            });
+        auto uHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), uOwned );
+        auto vHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), vOwned );
+	const char *varnames[3] = {"u", "v", "w"};
+	vars[0] = uOwned.data();
+	vars[1] = vOwned.data();
+        DBPutQuadvar( dbfile, "velocity", meshname, Dims, (DBCAS_t)varnames, vars, zdims, 
+                      Dims, NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist);
+#endif
+
 	for (int i = 0; i < Dims; i++) {
             free(coords[i]);
         }
@@ -283,9 +310,9 @@ class SiloWriter {
             q_block_names[i]    = (char *)malloc( 1024 );
             v_block_names[i]    = (char *)malloc( 1024 );
 
-            sprintf( mesh_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/Mesh", group_rank, time_step, i );
-            sprintf( q_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/quantity", group_rank, time_step, i );
-            sprintf( v_block_names[i], "raw/CajitaFluidsOutput%05d%05d.pdb:/domain_%05d/velocity", group_rank, time_step, i );
+            sprintf( mesh_block_names[i], "raw/CajitaFluidsOutput%05d%05d.%s:/domain_%05d/Mesh", group_rank, time_step, file_ext, i );
+            sprintf( q_block_names[i], "raw/CajitaFluidsOutput%05d%05d.%s:/domain_%05d/quantity", group_rank, time_step, file_ext, i );
+            sprintf( v_block_names[i], "raw/CajitaFluidsOutput%05d%05d.%s:/domain_%05d/velocity", group_rank, time_step, file_ext, i );
             block_types[i] = DB_QUADMESH;
             var_types[i]   = DB_QUADVAR;
         }
@@ -319,7 +346,8 @@ class SiloWriter {
         DBfile *silo_file;
         DBfile *master_file;
         int     size;
-        int     driver = DB_PDB;
+        int     driver = DB_HDF5;
+	const char *file_ext = "hdf5";
         // TODO: Make the Number of Groups a Constant or a Runtime Parameter ( Between 8 and 64 )
         int            numGroups = 2;
         char           masterfilename[256], filename[256], nsname[256];
@@ -334,8 +362,8 @@ class SiloWriter {
         baton = PMPIO_Init( numGroups, PMPIO_WRITE, MPI_COMM_WORLD, 1, createSiloFile, openSiloFile, closeSiloFile, &driver );
 
         // Set Filename to Reflect TimeStep
-        sprintf( masterfilename, "data/CajitaFluids%05d.pdb", time_step );
-        sprintf( filename, "data/raw/CajitaFluidsOutput%05d%05d.pdb", PMPIO_GroupRank( baton, _pm->mesh()->rank() ), time_step );
+        sprintf( masterfilename, "data/CajitaFluids%05d.%s", time_step, file_ext );
+        sprintf( filename, "data/raw/CajitaFluidsOutput%05d%05d.%s", PMPIO_GroupRank( baton, _pm->mesh()->rank() ), time_step, file_ext );
         sprintf( nsname, "domain_%05d", _pm->mesh()->rank() );
 
         // Show Errors and Force FLoating Point
@@ -350,7 +378,7 @@ class SiloWriter {
         if ( _pm->mesh()->rank() == 0 ) {
             if ( DEBUG && _pm->mesh()->rank() == 0 ) std::cerr << "SiloWriter: Rank 0 creating master file.\n"; 
             master_file = DBCreate( masterfilename, DB_CLOBBER, DB_LOCAL, "CajitaFluids", driver );
-            writeMultiObjects( master_file, baton, size, time_step, "pdb" );
+            writeMultiObjects( master_file, baton, size, time_step, "hdf5" );
             DBClose( master_file );
         }
 

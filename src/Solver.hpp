@@ -112,9 +112,8 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	int t = 0;
         double time = 0.0;
         int num_step;
-#if 1
+
         _silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
-#endif
 	num_step = t_final / _dt;
 
         while ( (time < t_final) ) 
@@ -125,17 +124,12 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	    // 1. Handle inflow and body forces.
 	    addExternalInputs();
 
-#if 0
-	    // 2. Do the pressure solve to make the velocity field after inflow 
-	    //    divergence-free
-	    // 2.1 Do a velocity halo for computing the RHS
-            // XXX
-	    _pm->gather( FaceI(), Field::Velocity() );
-	    _pm->gather( FaceJ(), Field::Velocity() );
+#if 1
+	    // 2. Adjust the velocity field to be divergence-free 
             _buildRHS();
 	    _pressure_solver->solve( *_lhs, *_rhs );
 	    _apply_pressure();
-#endif    
+#endif
 
 #if 0
 	    // 3. Exchange velocity halos for advection
@@ -146,12 +140,10 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
             //TimeIntegrator::step( ExecutionSpace(), *_pm, _dt, _bc );
 #endif
 
-#if 1
 	    // 4. Output mesh state periodically
             if ( 0 == t % write_freq ) {
                 _silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
 	    }
-#endif
             time += _dt;
             t++;
         }
@@ -189,7 +181,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
                 entry_view( i, j, 2 ) = -1.0*scale;
                 entry_view( i, j, 3 ) = -1.0*scale;
                 entry_view( i, j, 4 ) = -1.0*scale;
-	        _bc(gi, gj, i, j, entry_view, scale);
+	        _bc.build_matrix(gi, gj, i, j, entry_view, scale);
 	    });
 	_pressure_solver->setMatrixValues( *matrix_entries );
     }
@@ -208,7 +200,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 
         auto quantity = _pm->get( Cell(), Field::Quantity() );
 	local_mesh.coordinates( Cell(), baseidx, baseloc);
-        Kokkos::parallel_for( "add external inputs",
+        Kokkos::parallel_for( "add external quantity",
             createExecutionPolicy( owned_cells, ExecutionSpace() ),
             KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
 		double x = baseloc[0] + i * cell_size, 
@@ -220,34 +212,84 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
         auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
         auto ui  = _pm->get( FaceI(), Field::Velocity() );
 	local_mesh.coordinates( FaceI(), baseidx, baseloc);
-        Kokkos::parallel_for( "add external inputs",
+        Kokkos::parallel_for( "add external x velocity",
             createExecutionPolicy( owned_ifaces, ExecutionSpace() ),
             KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
 		double x = baseloc[0] + i * cell_size, 
 		       y = baseloc[i] + j * cell_size;
-                _source(FaceI(), quantity, i, j, x, y, _dt, cell_area);
-                _body(FaceI(), quantity, i, j, x, y, _dt, cell_area);
+                _source(FaceI(), ui, i, j, x, y, _dt, cell_area);
+                _body(FaceI(), ui, i, j, x, y, _dt, cell_area);
             });
 
         auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
         auto uj  = _pm->get( FaceJ(), Field::Velocity() );
 	local_mesh.coordinates( FaceJ(), baseidx, baseloc);
-        Kokkos::parallel_for( "add external inputs",
+        Kokkos::parallel_for( "add external y velocity",
             createExecutionPolicy( owned_jfaces, ExecutionSpace() ),
             KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
 		double x = baseloc[0] + i * cell_size, 
 		       y = baseloc[i] + j * cell_size;
-                _source(FaceJ(), quantity, i, j, x, y, _dt, cell_area);
-                _body(FaceJ(), quantity, i, j, x, y, _dt, cell_area);
+                _source(FaceJ(), uj, i, j, x, y, _dt, cell_area);
+                _body(FaceJ(), uj, i, j, x, y, _dt, cell_area);
             });
     }
 
     void _apply_pressure()
     {
+        auto scale = _density * _mesh->cellSize() * _mesh->cellSize();
+        auto u  = _pm->get( FaceI(), Field::Velocity() );
+        auto v  = _pm->get( FaceJ(), Field::Velocity() );
+	auto p  = _lhs->view();
+        auto l2g = Cajita::IndexConversion::createL2G( *( _mesh->localGrid() ),
+                                                        Cell());
+        auto local_grid =  _mesh->localGrid();
+        auto cell_space = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(),
+                                                  Cajita::Local() );
+
+	/* Now apply the LHS to adjust the velocity field. XXX Do we need to 
+	 * halo the lhs here??? XXX */
+        Kokkos::parallel_for(
+            "apply pressure", createExecutionPolicy( cell_space, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
+                u(i, j, 0) -= scale * (p(i, j, 0) - p(i-1, j  , 0));
+                v(i, j, 0) -= scale * (p(i, j, 0) - p(i,   j-1, 0));
+
+		int gi, gj;
+                l2g(i, j, gi, gj); 
+		_bc.apply_pressure(gi, gj, i, j, p, u, v, scale);
+            });
     }
 
     void _buildRHS() 
     {
+        // Zero the RHS
+	//Cajita::ArrayOp::assign(_rhs, 0.0, Cajita::Own());
+        auto scale = _density * _mesh->cellSize() * _mesh->cellSize();
+
+        auto u  = _pm->get( FaceI(), Field::Velocity() );
+        auto v  = _pm->get( FaceJ(), Field::Velocity() );
+
+        // For now we manually compute the divergence from the staggered
+	// mesh for simplicity. Later we will want to use a G2G interface
+        // in Cajita similar to its G2P interface, but that's not been 
+        // developed yet. 
+        auto local_grid = _mesh->localGrid();
+        auto cell_space = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(),
+                                                  Cajita::Local() );
+        auto rhs = _rhs->view();
+
+        // Snce we're not using the Cajita interpolication interface, we have
+        // to halo manually
+        _pm->gather( FaceI(), Field::Velocity() );
+        _pm->gather( FaceJ(), Field::Velocity() );
+
+        Kokkos::parallel_for(
+            "divergence", createExecutionPolicy( cell_space, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
+                rhs(i, j, 0) = -scale * 
+			(u(i+1, j, 0) - u(i, j, 0) 
+			 + v(i, j+1, 0) - v(i, j, 0));
+            });
     }
 
   private:

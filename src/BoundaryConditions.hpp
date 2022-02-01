@@ -35,7 +35,8 @@ struct BoundaryType {
 
 /**
  * @struct BoundaryCondition
- * @brief Struct that applies the specified boundary conditions with a Kokkos Inline Function
+ * @brief Struct that applies the specified boundary conditions with 
+ * Kokkos inline Functions
  */
 template <std::size_t NumSpaceDim> struct BoundaryCondition;
 
@@ -43,39 +44,49 @@ template <std::size_t NumSpaceDim> struct BoundaryCondition;
 // inside the domain, could use the same approach.
 template <> struct BoundaryCondition<2> {
         template <class ArrayType>
-        KOKKOS_INLINE_FUNCTION void operator()( const int gi, const int gj, 
-						const int i, const int j, 
-						ArrayType &matentry, 
-                                                const double scale ) const {
-	    // Our boundary conditions manifest mainly as updates to the pressure solve. Assume 
-	    // the matrix has been initialized and we simply need to adjust the weights 
-	    // for the boundaries.
+        KOKKOS_INLINE_FUNCTION void build_matrix( const int gi, const int gj, 
+						  const int i, const int j, 
+						  ArrayType &matrix, 
+                                                  const double scale ) const {
+	    // Correct the equations used in the pressure solve for the boundary
+            // conditions. Assumes he matrix has been initialized as a full
+            // stencil and we need to adjust the weights for the boundaries.
 
-            // Left Boundary
-            if ( gi <= min[0] ) {
-		matentry(i, j, 1) = 0; 
+            if ( gi <= min[0] ) { // Left Boundary
+		matrix(i, j, 1) = 0; 
                 if ( boundary_type[0] == BoundaryType::SOLID ) {
-		    matentry(i, j, 0) -= scale;
+		    matrix(i, j, 0) -= scale;
 		}
             }
-            if ( gj <= min[1] ) {
-		matentry(i, j, 3) = 0;
+            if ( gj <= min[1] ) { // Bottom Boundary
+		matrix(i, j, 3) = 0;
                 if ( boundary_type[1] == BoundaryType::SOLID ) {
-		    matentry(i, j, 0) -= scale;
+		    matrix(i, j, 0) -= scale;
 		}
 	    }
-            if ( gi > max[0] - 1 ) {
-		matentry(i, j, 2) = 0; 
+            if ( gi > max[0] - 1 ) { // Right Boundary
+		matrix(i, j, 2) = 0; 
                 if ( boundary_type[2] == BoundaryType::SOLID ) {
-		    matentry(i, j, 0) -= scale;
+		    matrix(i, j, 0) -= scale;
                 }
             }
-            if ( gj > max[1] - 1 ) {
-		matentry(i, j, 4) = 0; 
+            if ( gj > max[1] - 1 ) { // Top Boundary
+		matrix(i, j, 4) = 0; 
                 if ( boundary_type[3] == BoundaryType::SOLID ) {
-		   matentry(i, j, 0) -= scale;
+		   matrix(i, j, 0) -= scale;
                 }
             }
+        }
+
+        template <class PressureType, class UType, class VType>
+        KOKKOS_INLINE_FUNCTION void apply_pressure( const int gi, const int gj,
+						    const int i, const int j, 
+						    PressureType &p, 
+						    UType &u, VType &v,
+                                                    const double scale ) const {
+	    // Correct the application of the pressure to correct velocities
+	    // at the boundaries. Assumes the general pressure correction has
+            // already been applied.
         }
 
         Kokkos::Array<int, 4> boundary_type; /**< Boundary condition type on all walls  */
