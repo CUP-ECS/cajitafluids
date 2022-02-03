@@ -205,8 +205,8 @@ class SiloWriter {
         auto uHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), uOwned );
         auto vHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), vOwned );
 	const char *varnames[3] = {"u", "v", "w"};
-	vars[0] = uOwned.data();
-	vars[1] = vOwned.data();
+	vars[0] = uHost.data();
+	vars[1] = vHost.data();
         DBPutQuadvar( dbfile, "velocity", meshname, Dims, (DBCAS_t)varnames, vars, zdims, 
                       Dims, NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist);
 #endif

@@ -221,6 +221,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 #endif
 
 #if DEBUG
+	auto entry_view_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), entry_view);
         std::cout << "Matrix Rows:\n";
 	std::cout << std::fixed;
 	std::cout << std::showpoint;
@@ -238,14 +239,14 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 			if ((otheri < 0) || (otherj < 0) 
 			    || (otheri >= owned_space.extent(0))
 			    || (otherj >= owned_space.extent(1))) {
-                            assert(entry_view(iidx, jidx, s) == 0);
+                            assert(entry_view_host(iidx, jidx, s) == 0);
 			    continue;
 			}
 			int otheridx = otheri * owned_space.extent(0) + otherj;
 			if (k == otheridx) {
 		            int otheriidx = otheri + owned_space.min(0);
 		            int otherjidx = otherj + owned_space.min(1);
-			    std::cout << std::right << std::setw(5) << entry_view(iidx, jidx, s) << " ";
+			    std::cout << std::right << std::setw(5) << entry_view_host(iidx, jidx, s) << " ";
 			    found = 1;
                         }
 		    }
@@ -329,7 +330,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	 * halo the lhs here??? XXX */
         Kokkos::parallel_for(
             "apply pressure", createExecutionPolicy( cell_space, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
+            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
                 u(i, j, 0) -= scale * (p(i, j, 0) - p(i-1, j  , 0));
                 v(i, j, 0) -= scale * (p(i, j, 0) - p(i,   j-1, 0));
 
@@ -370,13 +371,14 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 			 + v(i, j+1, 0) - v(i, j, 0));
             });
 #if DEBUG
+	auto rhs_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), rhs);
         std::cout << "RHS:\n";
         auto owned_space = _mesh->localGrid()->indexSpace( Cajita::Own(), Cell(), Cajita::Local() );
         for (int i = owned_space.min(0); i < owned_space.max(0); i++) {
             for (int j = owned_space.min(1); j < owned_space.max(1); j++) {
 		std::cout << "(" << (i - owned_space.min(0))
 			  << "," << (j - owned_space.min(1)) << "): ";
-		std::cout << rhs(i, j, 0) << "\n";
+		std::cout << rhs_host(i, j, 0) << "\n";
 	    }
         }
 	std::cout << std::flush;

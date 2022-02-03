@@ -119,7 +119,7 @@ void usage( const int rank, char *progname ) {
  * @return Error status
  */
 int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
-    cl.device = "serial";              // Default Thread Setting
+    cl.device = "cuda";              // Default Thread Setting
     cl.t_final = 4.0;   
     cl.delta_t = 0.005;  
     cl.write_freq = 20;  
@@ -225,7 +225,7 @@ int main( int argc, char *argv[] ) {
     // Only Rank 0 Prints Command Line Options
     if ( rank == 0 ) {
         // Print Command Line Options
-        std::cout << "ExaClamr\n";
+        std::cout << "CajitaFluids\n";
         std::cout << "=======Command line arguments=======\n";
         std::cout << std::left << std::setw( 20 ) << "Thread Setting" << ": " 
 		  << std::setw( 8 ) << cl.device << "\n"; // Threading Setting
