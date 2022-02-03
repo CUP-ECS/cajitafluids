@@ -231,17 +231,18 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 		for (int k = 0; k < owned_space.size(); k++) {
 		    int found = 0;
 		    for (int s = 0; s < stencil.size(); s++) {
+		        int iidx = i + owned_space.min(0);
+		        int jidx = j + owned_space.min(1);
 			int otheri = i + stencil[s][0],
 			    otherj = j + stencil[s][1]; 
 			if ((otheri < 0) || (otherj < 0) 
 			    || (otheri >= owned_space.extent(0))
 			    || (otherj >= owned_space.extent(1))) {
+                            assert(entry_view(iidx, jidx, s) == 0);
 			    continue;
 			}
 			int otheridx = otheri * owned_space.extent(0) + otherj;
 			if (k == otheridx) {
-		            int iidx = i + owned_space.min(0);
-		            int jidx = j + owned_space.min(1);
 		            int otheriidx = otheri + owned_space.min(0);
 		            int otherjidx = otherj + owned_space.min(1);
 			    std::cout << std::right << std::setw(5) << entry_view(iidx, jidx, s) << " ";
