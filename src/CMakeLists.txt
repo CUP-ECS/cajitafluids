@@ -19,6 +19,8 @@ target_link_libraries(cajitafluids
   Cabana::Cajita
   Silo::silo )
 
+# Add HYPRE:HYPRE to the above if needed for a cabana-local build
+
 target_include_directories(cajitafluids
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

@@ -12,6 +12,8 @@
 #define DEBUG 1
 #endif
 
+//#define HYPRE
+
 // Include Statements
 #include <BoundaryConditions.hpp>
 #include <Solver.hpp>
@@ -121,10 +123,10 @@ int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
     cl.t_final = 4.0;   
     cl.delta_t = 0.005;  
     cl.write_freq = 20;  
-    cl.global_num_cells    = { 8, 8 };
+    cl.global_num_cells    = { 4, 4 };
     cl.global_bounding_box = { 0, 0, 1.0, 1.0 };
-    cl.inLocation =  	     {0.40, 0.40};
-    cl.inSize =  	     {0.2, 0.2};
+    cl.inLocation =  	     {0.3, 0.3};
+    cl.inSize =  	     {0.4, 0.4};
     cl.inVelocity =          { 1.0, 0.0 };
     cl.inQuantity = 	     3.0;
     cl.density = 0.1;
