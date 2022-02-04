@@ -6,6 +6,7 @@ set(HEADERS
   ProblemManager.hpp
   SiloWriter.hpp
   Solver.hpp
+  VelocityCorrector.hpp
   )
 
 set(SOURCES
@@ -18,6 +19,8 @@ target_link_libraries(cajitafluids
   Cabana::cabanacore
   Cabana::Cajita
   Silo::silo )
+
+# Add HYPRE:HYPRE to the above if needed for a cabana-local build
 
 target_include_directories(cajitafluids
   PUBLIC

@@ -38,10 +38,9 @@ template <> struct InflowSource<2> {
 		 * interpolated across the volume of intersecting cells, but
 		 * we're forcing a quantity at the location to start to match 
 		 * the formulation of the original incremental fluids solver */
-                /* XXX incremental-fluids does an absolute value in the 
-                 * comparison - why? XXX */
 		if ( q(i, j, 0) < _quantity ) q(i, j, 0) = _quantity;
 	    }
+
         }
 
         template <class ArrayType>
@@ -51,7 +50,8 @@ template <> struct InflowSource<2> {
         {
 	    if (x >= _bounding_box[0] && x < _bounding_box[2] 
 		&& y >= _bounding_box[1] && y < _bounding_box[3]) {
-		if (ux(i, j, 0) < _velocity[0]) ux(i,j, 0) = _velocity[0];
+		if (fabs(ux(i, j, 0)) < fabs(_velocity[0]))
+		     ux(i,j, 0) = _velocity[0];
             }
         }
 
@@ -62,7 +62,8 @@ template <> struct InflowSource<2> {
         {
 	    if (x >= _bounding_box[0] && x < _bounding_box[2] 
 		&& y >= _bounding_box[1] && y < _bounding_box[3]) {
-		if (uy(i, j, 0) < _velocity[1]) uy(i,j,0) = _velocity[1];
+		if (fabs(uy(i, j, 0)) < fabs(_velocity[1]))
+		    uy(i,j,0) = _velocity[1];
             }
         }
  

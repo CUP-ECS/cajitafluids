@@ -58,18 +58,18 @@ template <> struct BoundaryCondition<2> {
 		    matrix(i, j, 0) -= scale;
 		}
             }
-            if ( gj <= min[1] ) { // Bottom Boundary
-		matrix(i, j, 3) = 0;
-                if ( boundary_type[1] == BoundaryType::SOLID ) {
-		    matrix(i, j, 0) -= scale;
-		}
-	    }
             if ( gi > max[0] - 1 ) { // Right Boundary
 		matrix(i, j, 2) = 0; 
                 if ( boundary_type[2] == BoundaryType::SOLID ) {
 		    matrix(i, j, 0) -= scale;
                 }
             }
+            if ( gj <= min[1] ) { // Bottom Boundary
+		matrix(i, j, 3) = 0;
+                if ( boundary_type[1] == BoundaryType::SOLID ) {
+		    matrix(i, j, 0) -= scale;
+		}
+	    }
             if ( gj > max[1] - 1 ) { // Top Boundary
 		matrix(i, j, 4) = 0; 
                 if ( boundary_type[3] == BoundaryType::SOLID ) {

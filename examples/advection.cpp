@@ -12,6 +12,8 @@
 #define DEBUG 0
 #endif
 
+//#define HYPRE
+
 // Include Statements
 #include <BoundaryConditions.hpp>
 #include <Solver.hpp>
@@ -121,10 +123,10 @@ int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
     cl.t_final = 4.0;   
     cl.delta_t = 0.005;  
     cl.write_freq = 20;  
-    cl.global_num_cells    = { 128, 128 };
+    cl.global_num_cells    = { 4, 4 };
     cl.global_bounding_box = { 0, 0, 1.0, 1.0 };
-    cl.inLocation =  	     {0.45, 0.2};
-    cl.inSize =  	     {0.1, 0.01};
+    cl.inLocation =  	     {0.3, 0.3};
+    cl.inSize =  	     {0.4, 0.4};
     cl.inVelocity =          { 1.0, 0.0 };
     cl.inQuantity = 	     3.0;
     cl.density = 0.1;
@@ -188,16 +190,7 @@ void advect( ClArgs &cl ) {
     MPI_Comm_size( MPI_COMM_WORLD, &comm_size ); // Number of Ranks
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );      // Get My Rank
 
-    int x_ranks = comm_size;
-    while ( x_ranks % 2 == 0 && x_ranks > 2 ) {
-        x_ranks /= 2;
-    }
-    int y_ranks = comm_size / x_ranks;
-    if ( DEBUG ) std::cout << "X Ranks: " << x_ranks << " Y Ranks: " << y_ranks << "\n";
-
-    std::array<int, 2> ranks_per_dim = { x_ranks, y_ranks }; // Ranks per Dimension
-
-    Cajita::ManualBlockPartitioner<2> partitioner( ranks_per_dim ); // Create Cajita Partitioner
+    Cajita::DimBlockPartitioner<2> partitioner; // Create Cajita Partitioner
     CajitaFluids::BoundaryCondition<2> bc;
     bc.boundary_type = {CajitaFluids::BoundaryType::SOLID,
                         CajitaFluids::BoundaryType::SOLID,
@@ -232,7 +225,7 @@ int main( int argc, char *argv[] ) {
     // Only Rank 0 Prints Command Line Options
     if ( rank == 0 ) {
         // Print Command Line Options
-        std::cout << "ExaClamr\n";
+        std::cout << "CajitaFluids\n";
         std::cout << "=======Command line arguments=======\n";
         std::cout << std::left << std::setw( 20 ) << "Thread Setting" << ": " 
 		  << std::setw( 8 ) << cl.device << "\n"; // Threading Setting
