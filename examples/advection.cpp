@@ -9,7 +9,7 @@
  */
 
 #ifndef DEBUG
-#define DEBUG 1
+#define DEBUG 0
 #endif
 
 //#define HYPRE
@@ -119,7 +119,7 @@ void usage( const int rank, char *progname ) {
  * @return Error status
  */
 int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
-    cl.device = "cuda";              // Default Thread Setting
+    cl.device = "serial";              // Default Thread Setting
     cl.t_final = 4.0;   
     cl.delta_t = 0.005;  
     cl.write_freq = 20;  

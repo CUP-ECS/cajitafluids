@@ -332,8 +332,8 @@ class SiloWriter {
         DBfile *silo_file;
         DBfile *master_file;
         int     size;
-        int     driver = DB_HDF5;
-	const char *file_ext = "hdf5";
+        int     driver = DB_PDB;
+	const char *file_ext = "pdb";
         // TODO: Make the Number of Groups a Constant or a Runtime Parameter ( Between 8 and 64 )
         int            numGroups = 2;
         char           masterfilename[256], filename[256], nsname[256];
@@ -360,7 +360,7 @@ class SiloWriter {
 
         if ( _pm->mesh()->rank() == 0 ) {
             master_file = DBCreate( masterfilename, DB_CLOBBER, DB_LOCAL, "CajitaFluids", driver );
-            writeMultiObjects( master_file, baton, size, time_step, "hdf5" );
+            writeMultiObjects( master_file, baton, size, time_step, "pdb" );
             DBClose( master_file );
         }
 

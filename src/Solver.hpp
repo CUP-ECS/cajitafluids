@@ -104,9 +104,9 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	// conjugate gradient by default.
 	_pressure_solver = Cajita::createHypreStructuredSolver<double, 
             MemorySpace>( "PCG", *vector_layout );
-       	auto preconditioner = Cajita::createHypreStructuredSolver<double,
-            MemorySpace>( "Diagonal", *vector_layout, true );
-        _pressure_solver->setPreconditioner( preconditioner );
+       	//auto preconditioner = Cajita::createHypreStructuredSolver<double,
+        //    MemorySpace>( "PFMG", *vector_layout, true );
+        //_pressure_solver->setPreconditioner( preconditioner );
 #else
    	_pressure_solver =
             Cajita::createReferenceConjugateGradient<double, 
@@ -116,7 +116,7 @@ class Solver<2, MemorySpace, ExecutionSpace> : public SolverBase
 	initializeSolverMatrix();
 
 		   
-	_pressure_solver->setTolerance ( 1.0e-9 );
+	_pressure_solver->setTolerance ( 1.0e-6 );
 	_pressure_solver->setMaxIter ( 2000 );
 	_pressure_solver->setPrintLevel( 1 );
 	// We could create a preconditioner here if we wanted, but we are lazy.
