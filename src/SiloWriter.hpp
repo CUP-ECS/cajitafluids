@@ -113,7 +113,7 @@ class SiloWriter {
 
         // Advected quantity first - copy owned portion from the primary 
         // execution space to the host execution space
-        auto q = _pm->get( Cajita::Cell(), Field::Quantity() );
+        auto q = _pm->get( Cajita::Cell(), Field::Quantity(), Version::Current() );
 	auto xmin = cell_domain.min(0);
 	auto ymin = cell_domain.min(1);
         Kokkos::View<typename pm_type::cell_array::value_type***, Kokkos::LayoutLeft,
@@ -130,8 +130,8 @@ class SiloWriter {
         DBPutQuadvar1( dbfile, "quantity", meshname, qHost.data(), zdims, Dims,
                        NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
 
-        auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
-        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
+        auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), Version::Current() );
+        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), Version::Current() );
 #ifdef EDGE_VOLICITY_IO
         // Velocity faces need to be in a single array, ordered by i then j
 	// edges. i-faces in 2D are j-oriented edges, so we do v then u. In 

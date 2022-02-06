@@ -144,7 +144,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
         auto owned_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
-        auto quantity = _pm->get( Cell(), Field::Quantity() );
+        auto quantity = _pm->get( Cell(), Field::Quantity(), Version::Current() );
         Kokkos::parallel_for( "add external quantity",
             createExecutionPolicy( owned_cells, ExecutionSpace() ),
             KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
@@ -158,7 +158,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             });
 
         auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
-        auto ui  = _pm->get( FaceI(), Field::Velocity() );
+        auto ui  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
         Kokkos::parallel_for( "add external x velocity",
             createExecutionPolicy( owned_ifaces, ExecutionSpace() ),
             KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
@@ -172,7 +172,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             });
 
         auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
-        auto uj  = _pm->get( FaceJ(), Field::Velocity() );
+        auto uj  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
         Kokkos::parallel_for( "add external y velocity",
             createExecutionPolicy( owned_jfaces, ExecutionSpace() ),
             KOKKOS_CLASS_LAMBDA( const int i, const int j ) {

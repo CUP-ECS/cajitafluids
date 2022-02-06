@@ -27,6 +27,30 @@ namespace CajitaFluids {
 
 /**
  * @namespace Field
+ * @brief Version namespace to track whether the current or next array version is requested
+ **/
+namespace Version {
+
+/**
+ * @struct Current
+ * @brief Tag structure for the current values of field variables. Used when 
+ * values are only being read or the algorithm allows the variable to be modified
+ * in place
+ **/
+struct Current {};
+
+/**
+ * @struct Next
+ * @brief Tag structure for the values of field variables at the next timestep. 
+ * Used when values being written cannot be modified in place. Note that next
+ * values are only written, current values are read or written.
+ **/
+struct Next {};
+
+} // namespace Version
+
+/**
+ * @namespace Field
  * @brief Field namespace to track state array entities
  **/
 namespace Field {
@@ -104,12 +128,16 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 
 	// The actual arrays storing mesh quantities
         // 1. The quantity of the scalar quantity being advected
-        _quantity = Cajita::createArray<double, MemorySpace>("quantity",
-                                                            cell_scalar_layout);
+        _quantity_curr = Cajita::createArray<double, MemorySpace>("quantity",
+                                                                  cell_scalar_layout);
+        _quantity_next = Cajita::createArray<double, MemorySpace>("quantity",
+                                                                  cell_scalar_layout);
 	
 	// 2. The magnitudes of the velocities normal to the cell faces
-        _ui = Cajita::createArray<double, MemorySpace>( "ui", iface_scalar_layout);
-        _uj = Cajita::createArray<double, MemorySpace>( "uj", jface_scalar_layout);
+        _ui_curr = Cajita::createArray<double, MemorySpace>( "ui", iface_scalar_layout);
+        _ui_next = Cajita::createArray<double, MemorySpace>( "ui", iface_scalar_layout);
+        _uj_curr = Cajita::createArray<double, MemorySpace>( "uj", jface_scalar_layout);
+        _uj_next = Cajita::createArray<double, MemorySpace>( "uj", jface_scalar_layout);
 
         // Halo patterns for the velocity and quantity halos. These halos are 
 	// used for advection calculations, and are two cells deep as that is the
@@ -150,7 +178,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 	double cell_size = _mesh->cellSize();
 
         // Get State Arrays
-        auto q = get( Cajita::Cell(), Field::Quantity() );
+        auto q = get( Cajita::Cell(), Field::Quantity(), Version::Current() );
 
         // Loop Over All Owned Cells ( i, j )
         auto own_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
@@ -173,7 +201,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         // Loop Over All Owned I-Faces ( i, j )
         auto own_faces = local_grid.indexSpace( 
             Cajita::Own(), Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
-        auto ui = get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity() );
+        auto ui = get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), Version::Current() );
 	local_mesh.coordinates( Cajita::Face<Cajita::Dim::I>(), index, loc ); 
         Kokkos::parallel_for(
             "Initialize I-Faces", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), 
@@ -192,7 +220,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         // Loop Over All Owned J-Faces ( i, j )
         own_faces = local_grid.indexSpace( 
             Cajita::Own(), Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
-        auto uj = get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity() );
+        auto uj = get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), Version::Current() );
 	local_mesh.coordinates( Cajita::Face<Cajita::Dim::J>(), index, loc ); 
         Kokkos::parallel_for(
             "Initialize J-Faces", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), 
@@ -222,39 +250,101 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * Return Quantity Field
      * @param Location::Cell
      * @param Field::Quantity
-     * @return Returns view of advected quantity at cell centers
+     * @param Version::Current
+     * @return Returns view of current advected quantity at cell centers
      **/
-    typename cell_array::view_type get( Cajita::Cell, Field::Quantity ) const {
-        return _quantity->view();
+    typename cell_array::view_type get( Cajita::Cell, Field::Quantity, Version::Current ) const {
+        return _quantity_curr->view();
+    };
+
+    /**
+     * Return Quantity Field
+     * @param Location::Cell
+     * @param Field::Quantity
+     * @param Version::Next
+     * @return Returns view of next advected quantity at cell centers
+     **/
+    typename cell_array::view_type get( Cajita::Cell, Field::Quantity, Version::Next ) const {
+        return _quantity_next->view();
     };
 
     /**
      * Return I Face Velocity 
      * @param Face<Dim::I>
      * @param Field::Velocity
-     * @return Returns view of norm velocity magnitude on i faces
+     * @param Version::Current
+     * @return Returns view of current norm velocity magnitude on i faces
      **/
-    typename cell_array::view_type get( Cajita::Face<Cajita::Dim::I>, Field::Velocity ) const {
-        return _ui->view();
+    typename cell_array::view_type get( Cajita::Face<Cajita::Dim::I>, Field::Velocity, Version::Current ) const {
+        return _ui_curr->view();
+    };
+
+    /**
+     * Return I Face Velocity 
+     * @param Face<Dim::I>
+     * @param Field::Velocity
+     * @param Version::Next
+     * @return Returns view of next norm velocity magnitude on i faces
+     **/
+    typename cell_array::view_type get( Cajita::Face<Cajita::Dim::I>, Field::Velocity, Version::Next ) const {
+        return _ui_next->view();
     };
 
     /**
      * Return J Face Velocity 
      * @param Face<Dim::J>
      * @param Field::Velocity
-     * @return Returns view of norm velocity magnitude on j faces
+     * @param Version::Current
+     * @return Returns view of current norm velocity magnitude on j faces
      **/
-    typename cell_array::view_type get( Cajita::Face<Cajita::Dim::J>, Field::Velocity ) const {
-        return _uj->view();
+    typename cell_array::view_type get( Cajita::Face<Cajita::Dim::J>, Field::Velocity, Version::Current ) const {
+        return _uj_curr->view();
     };
 
+    /**
+     * Return J Face Velocity 
+     * @param Face<Dim::J>
+     * @param Field::Velocity
+     * @param Version::Next
+     * @return Returns view of next norm velocity magnitude on j faces
+     **/
+    typename cell_array::view_type get( Cajita::Face<Cajita::Dim::J>, Field::Velocity, Version::Next ) const {
+        return _uj_next->view();
+    };
+
+    /**
+     * Make the next version of a field the current one XXX should this zero the next version?
+     * @param Cajita::Cell
+     * @param Field::Quantity
+     **/
+    void advance( Cajita::Cell, Field::Quantity) {
+	_quantity_curr.swap(_quantity_next);
+    }
+
+    /**
+     * Make the next version of a field the current one XXX should this zero the next version?
+     * @param Cajita::Face<Cajita::DimI>
+     * @param Field::Velocity
+     **/
+    void advance( Cajita::Face<Cajita::Dim::I>, Field::Velocity) {
+	_ui_curr.swap(_ui_next);
+    }
+
+    /**
+     * Make the next version of a field the current one XXX should this zero the next version?
+     * @param Cajita::Face<Cajita::Dim::J>
+     * @param Field::Velocity
+     **/
+    void advance( Cajita::Face<Cajita::Dim::J>, Field::Velocity) {
+	_uj_curr.swap(_uj_next);
+    }
 
     /**
      * Scatter State Data to Neighbors
      * @param Location::Cell
      **/
     void scatter( Cajita::Cell, Field::Quantity) const {
-        _cell_halo->scatter( ExecutionSpace(), *_quantity);
+        _cell_halo->scatter( ExecutionSpace(), *_quantity_curr);
     };
 
     /**
@@ -262,7 +352,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Location::Face<Dim::I>
      **/
     void scatter( Cajita::Face<Cajita::Dim::I>, Field::Velocity ) const {
-        _iface_halo->scatter( ExecutionSpace(), *_ui);
+        _iface_halo->scatter( ExecutionSpace(), *_ui_curr);
     };
 
     /**
@@ -270,7 +360,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Location::Face<Dim::J>
      **/
     void scatter( Cajita::Face<Cajita::Dim::J>, Field::Velocity ) const {
-        _jface_halo->scatter( ExecutionSpace(), *_uj);
+        _jface_halo->scatter( ExecutionSpace(), *_uj_curr);
     };
 
 
@@ -279,20 +369,20 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Location::Cell
      **/
     void gather( Cajita::Cell, Field::Quantity ) const {
-        _cell_halo->gather( ExecutionSpace(), *_quantity );
+        _cell_halo->gather( ExecutionSpace(), *_quantity_curr );
     };
     void gather( Cajita::Face<Cajita::Dim::I>, Field::Velocity ) const {
-        _iface_halo->gather( ExecutionSpace(), *_ui);
+        _iface_halo->gather( ExecutionSpace(), *_ui_curr);
     };
     void gather( Cajita::Face<Cajita::Dim::J>, Field::Velocity ) const {
-        _jface_halo->gather( ExecutionSpace(), *_uj);
+        _jface_halo->gather( ExecutionSpace(), *_uj_curr);
     };
 
 
   private:
-    std::shared_ptr<cell_array> _quantity;
-    std::shared_ptr<iface_array> _ui;
-    std::shared_ptr<jface_array> _uj;
+    std::shared_ptr<cell_array> _quantity_curr, _quantity_next;
+    std::shared_ptr<iface_array> _ui_curr, _ui_next;
+    std::shared_ptr<jface_array> _uj_curr, _uj_next;
     std::shared_ptr<mesh_type> _mesh; /**< Mesh object */
     std::shared_ptr<halo> _iface_halo;
     std::shared_ptr<halo> _jface_halo;
