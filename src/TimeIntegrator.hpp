@@ -44,9 +44,32 @@ void advect(ExecutionSpace &exec_space, ProblemManagerType &pm, double delta_t,
 {
     auto u_current = pm.get(FaceI(), Field::Velocity(), Version::Current() );
     auto v_current = pm.get(FaceJ(), Field::Velocity(), Version::Current() );
-    auto field_current = pm.get(entity, field, Version::Current() );
-    auto field_next = pm.get(entity, field, Version::Current() );
 
+    auto field_current = pm.get(entity, field, Version::Current() );
+    auto field_next = pm.get(entity, field, Version::Next() );
+
+    auto local_grid = pm.mesh()->localGrid();
+    auto local_mesh = *(pm.mesh()->localMesh());
+
+    // XX Only handling 2D for now
+    auto owned_items = local_grid->indexSpace( Cajita::Own(), entity, 
+                                               Cajita::Local() );
+    parallel_for("advection loop", 
+        createExecutionPolicy(owned_items, exec_space), 
+        KOKKOS_LAMBDA(int i, int j) {
+            int idx[2] = {i, j};
+            double loc[NumSpaceDims];
+            // 1. Get the location of the entity in question
+	    local_mesh.coordinates( entity, idx, loc);
+
+            // 2. Trace the location back through the velocity field 
+            // rk3(loc, u_current, v_current);
+
+            // 3. Interpolate the value of the advected quantity at that location
+            auto new_value = field_current(i, j, 0);
+
+            field_next(i, j, 0) = new_value;
+        });
     // Now advect from current to next in the given velocity field
     // XXX
 }
