@@ -24,7 +24,7 @@
 #include <BodyForce.hpp>
 #include <SiloWriter.hpp>
 #include <VelocityCorrector.hpp>
-//#include <TimeIntegrator.hpp>
+#include <TimeIntegrator.hpp>
 
 #include <Kokkos_Core.hpp>
 #include <memory>
@@ -114,14 +114,9 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 	    // 2. Adjust the velocity field to be divergence-free 
             _vc->correctVelocity();
 
-#if 0
-	    // 3. Exchange velocity halos for advection
-	    // 3.1 XXX Do a velocity halo for computing advection
-	    _pm->gather( FaceI(), Field::Velocity() );
-	    _pm->gather( FaceJ(), Field::Velocity() );
-	    // 3.2 XXX Do a time step of advection
-	    //TimeIntegrator::step( ExecutionSpace(), *_pm, _dt, _bc );
-#endif
+            // 3. Advect the quantities forward a time step in the 
+            // computed velocity field
+	    TimeIntegrator::step<2>( ExecutionSpace(), *_pm, _dt, _bc );
 
 	    // 4. Output mesh state periodically
 	    if ( 0 == t % write_freq ) {
