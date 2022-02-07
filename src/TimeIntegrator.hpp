@@ -59,25 +59,21 @@ void interpolateVelocity(const double loc[2],
             		 const ProblemManager_t &pm, 
 		         double velocity[NumSpaceDims])
 {
-    double value[1];
     Cajita::SplineData<double, 1, NumSpaceDims, FaceI> uspline;
     Cajita::evaluateSpline(local_mesh, loc, uspline);
     auto u = pm.get(FaceI(), Field::Velocity(), Version::Current());
-    Cajita::G2P::value(u, uspline, value);
-    velocity[0] = value[0];
+    Cajita::G2P::value(u, uspline, velocity[0]);
 
     Cajita::SplineData<double, 1, NumSpaceDims, FaceJ> vspline;
     Cajita::evaluateSpline(local_mesh, loc, vspline);
     auto v = pm.get(FaceJ(), Field::Velocity(), Version::Current());
-    Cajita::G2P::value(v, vspline, value);
-    velocity[1] = value[0];
+    Cajita::G2P::value(v, vspline, velocity[1]);
     
     if constexpr (NumSpaceDims == 3) {
         Cajita::SplineData<double, 1, NumSpaceDims, FaceK> wspline;
         Cajita::evaluateSpline(local_mesh, loc, wspline);
         auto w = pm.get(FaceK(), Field::Velocity(), Version::Current());
-        Cajita::G2P::value(w, wspline, value);
-        velocity[2] = value[0];
+        Cajita::G2P::value(w, wspline, velocity[2]);
     }
 }
  

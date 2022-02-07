@@ -123,10 +123,10 @@ int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
     cl.t_final = 4.0;   
     cl.delta_t = 0.005;  
     cl.write_freq = 20;  
-    cl.global_num_cells    = { 4, 4 };
+    cl.global_num_cells    = { 128, 128 };
     cl.global_bounding_box = { 0, 0, 1.0, 1.0 };
-    cl.inLocation =  	     {0.3, 0.3};
-    cl.inSize =  	     {0.4, 0.4};
+    cl.inLocation =  	     {0.2, 0.45};
+    cl.inSize =  	     {0.02, 0.1};
     cl.inVelocity =          { 1.0, 0.0 };
     cl.inQuantity = 	     3.0;
     cl.density = 0.1;
