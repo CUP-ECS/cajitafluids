@@ -35,6 +35,88 @@ using FaceI = Cajita::Face<Cajita::Dim::I>;
 using FaceJ = Cajita::Face<Cajita::Dim::J>;
 using FaceK = Cajita::Face<Cajita::Dim::K>;
 
+// Cubic spline to interpolate values for advection.
+template <std::size_t NumSpaceDims, class Mesh_t, class View_t, class Entity_t>
+double interpolateField(const double loc[NumSpaceDims], 
+                        const Mesh_t &local_mesh, 
+			const Entity_t entity,
+                        const View_t &field)
+{
+    double value;
+    Cajita::SplineData<double, 3, NumSpaceDims, Entity_t> spline;
+    Cajita::evaluateSpline(local_mesh, loc, spline);
+    Cajita::G2P::value(field, spline, value);
+    return value;
+}
+
+/* We just use first order (linear) interpolation of velocity during 
+ * runge kutta integration to mimic what the original code does. Would be 
+ * easy to switch to a higher-order interpolation here and reuse the code
+ * above or parameterize on the order of the spline. */
+template <std::size_t NumSpaceDims, class Mesh_t, class ProblemManager_t>
+void interpolateVelocity(const double loc[2], 
+                         const Mesh_t &local_mesh,
+            		 const ProblemManager_t &pm, 
+		         double velocity[NumSpaceDims])
+{
+    double value[1];
+    Cajita::SplineData<double, 1, NumSpaceDims, FaceI> uspline;
+    Cajita::evaluateSpline(local_mesh, loc, uspline);
+    auto u = pm.get(FaceI(), Field::Velocity(), Version::Current());
+    Cajita::G2P::value(u, uspline, value);
+    velocity[0] = value[0];
+
+    Cajita::SplineData<double, 1, NumSpaceDims, FaceJ> vspline;
+    Cajita::evaluateSpline(local_mesh, loc, vspline);
+    auto v = pm.get(FaceJ(), Field::Velocity(), Version::Current());
+    Cajita::G2P::value(v, vspline, value);
+    velocity[1] = value[0];
+    
+    if constexpr (NumSpaceDims == 3) {
+        Cajita::SplineData<double, 1, NumSpaceDims, FaceK> wspline;
+        Cajita::evaluateSpline(local_mesh, loc, wspline);
+        auto w = pm.get(FaceK(), Field::Velocity(), Version::Current());
+        Cajita::G2P::value(w, wspline, value);
+        velocity[2] = value[0];
+    }
+}
+ 
+// 
+template <std::size_t NumSpaceDims, class Mesh_t, class ProblemManager_t>
+void rk3(const double x0[NumSpaceDims], 
+         const Mesh_t &local_mesh, const ProblemManager_t &pm, 
+         double delta_t, double trace[NumSpaceDims])
+{
+    double v0[NumSpaceDims], 
+           x1[NumSpaceDims], v1[NumSpaceDims],
+	   x2[NumSpaceDims], v2[NumSpaceDims]; 
+
+    // Velocity at current location.
+    interpolateVelocity<NumSpaceDims>(x0, local_mesh, pm, v0);
+
+    // Velocity half a timestep back
+    x1[0] = x0[0] - 0.5*delta_t*v0[0];
+    x1[1] = x0[1] - 0.5*delta_t*v0[1];
+    if constexpr (NumSpaceDims == 3) 
+        x1[2] = x0[2] - 0.5*delta_t*v0[2];
+    interpolateVelocity<NumSpaceDims>(x1, local_mesh, pm, v1);
+
+    // Velocity three-quarters of a timestep step back
+    x2[0] = x0[0] - 0.75*delta_t*v0[0];
+    x2[1] = x0[1] - 0.75*delta_t*v0[1];
+    if constexpr (NumSpaceDims == 3) 
+        x1[2] = x0[2] - 0.5*delta_t*v0[2];
+    interpolateVelocity<NumSpaceDims>(x2, local_mesh, pm, v2);
+
+    // Final location after a timestep
+    trace[0] = x0[0] - delta_t*((2.0/9.0)*v0[0] + (3.0/9.0)*v1[0] + (4.0/9.0)*v2[0]);
+    trace[1] = x0[1] - delta_t*((2.0/9.0)*v0[1] + (3.0/9.0)*v1[1] + (4.0/9.0)*v2[1]);
+    if constexpr (NumSpaceDims == 3) {
+        trace[2] = x0[2] - delta_t*((2.0/9.0)*v0[2] + (3.0/9.0)*v1[2] + (4.0/9.0)*v2[2]);
+    }
+}
+
+
 //---------------------------------------------------------------------------//
 // Advect a field in a divergence-free velocity field
 template <std::size_t NumSpaceDims, class ProblemManagerType, class ExecutionSpace, 
@@ -42,9 +124,6 @@ template <std::size_t NumSpaceDims, class ProblemManagerType, class ExecutionSpa
 void advect(ExecutionSpace &exec_space, ProblemManagerType &pm, double delta_t, 
             const BoundaryCondition<NumSpaceDims> &bc, Entity_t entity, Field_t field)
 {
-    auto u_current = pm.get(FaceI(), Field::Velocity(), Version::Current() );
-    auto v_current = pm.get(FaceJ(), Field::Velocity(), Version::Current() );
-
     auto field_current = pm.get(entity, field, Version::Current() );
     auto field_next = pm.get(entity, field, Version::Next() );
 
@@ -58,20 +137,16 @@ void advect(ExecutionSpace &exec_space, ProblemManagerType &pm, double delta_t,
         createExecutionPolicy(owned_items, exec_space), 
         KOKKOS_LAMBDA(int i, int j) {
             int idx[2] = {i, j};
-            double loc[NumSpaceDims];
+            double start[NumSpaceDims], trace[NumSpaceDims];
             // 1. Get the location of the entity in question
-	    local_mesh.coordinates( entity, idx, loc);
+	    local_mesh.coordinates( entity, idx, start);
 
             // 2. Trace the location back through the velocity field 
-            // rk3(loc, u_current, v_current);
+            rk3<NumSpaceDims>(start, local_mesh, pm, delta_t, trace);
 
             // 3. Interpolate the value of the advected quantity at that location
-            auto new_value = field_current(i, j, 0);
-
-            field_next(i, j, 0) = new_value;
+            field_next(i, j, 0) = interpolateField<NumSpaceDims>(trace, local_mesh, entity, field_current);
         });
-    // Now advect from current to next in the given velocity field
-    // XXX
 }
 
 //---------------------------------------------------------------------------//
