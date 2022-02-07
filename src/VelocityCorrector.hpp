@@ -193,8 +193,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 	Cajita::ArrayOp::assign( *_rhs, 0.0, Cajita::Own());
         auto scale = 1.0 / _mesh->cellSize();
 
-        auto u  = _pm->get( FaceI(), Field::Velocity() );
-        auto v  = _pm->get( FaceJ(), Field::Velocity() );
+        auto u  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
+        auto v  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
 
         // For now we manually compute the divergence from the staggered
 	// mesh for simplicity. Later we will want to use a G2G interface
@@ -235,9 +235,12 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
     void _apply_pressure()
     {
         auto scale = _dt / (_density * _mesh->cellSize());
-        auto u  = _pm->get( FaceI(), Field::Velocity() );
-        auto v  = _pm->get( FaceJ(), Field::Velocity() );
+
+        // Modifies the current velocity field *in place* to be divergence free
+        auto u  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
+        auto v  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
 	auto p  = _lhs->view();
+
         auto l2g = Cajita::IndexConversion::createL2G( *( _mesh->localGrid() ),
                                                         Cell());
         auto local_grid =  _mesh->localGrid();

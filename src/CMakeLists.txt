@@ -6,6 +6,7 @@ set(HEADERS
   ProblemManager.hpp
   SiloWriter.hpp
   Solver.hpp
+  TimeIntegrator.hpp
   VelocityCorrector.hpp
   )
 
