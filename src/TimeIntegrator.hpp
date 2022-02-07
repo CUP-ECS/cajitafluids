@@ -1,10 +1,10 @@
 /****************************************************************************
- * Copyright (c) 2018-2020 by the ExaMPM authors                            *
+ * Copyright (c) 2022 by the CajitaFluids authors                           *
  * All rights reserved.                                                     *
  *                                                                          *
- * This file is part of the ExaMPM library. ExaMPM is distributed under a   *
- * BSD 3-clause license. For the licensing terms see the LICENSE file in    *
- * the top-level directory.                                                 *
+ * This file is part of the CajitaFluids library. CajitaFluids is           *
+ * distributed under a BSD 3-clause license. For the licensing terms see    *
+ * the LICENSE file in the top-level directory.                             *
  *                                                                          *
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
@@ -14,13 +14,11 @@
 
 #include <BoundaryConditions.hpp>
 #include <ProblemManager.hpp>
-//#include <VelocityInterpolation.hpp>
+#include <Interpolation.hpp>
 
 #include <Cajita.hpp>
 
 #include <Kokkos_Core.hpp>
-
-#include <cmath>
 
 namespace CajitaFluids
 {
@@ -34,41 +32,6 @@ using Cell = Cajita::Cell;
 using FaceI = Cajita::Face<Cajita::Dim::I>;
 using FaceJ = Cajita::Face<Cajita::Dim::J>;
 using FaceK = Cajita::Face<Cajita::Dim::K>;
-
-// Cubic spline to interpolate values for advection.
-template <std::size_t NumSpaceDims, class Mesh_t, class View_t, class Entity_t>
-KOKKOS_INLINE_FUNCTION
-double interpolateField(const double loc[NumSpaceDims], 
-                        const Mesh_t &local_mesh, 
-			const Entity_t entity,
-                        const View_t &field)
-{
-    double value;
-    Cajita::SplineData<double, 3, NumSpaceDims, Entity_t> spline;
-    Cajita::evaluateSpline(local_mesh, loc, spline);
-    Cajita::G2P::value(field, spline, value);
-    return value;
-}
-
-/* We just use first order (linear) interpolation of velocity during 
- * runge kutta integration to mimic what the original code does. Would be 
- * easy to switch to a higher-order interpolation here and reuse the code
- * above or parameterize on the order of the spline. */
-template <std::size_t NumSpaceDims, class Mesh_t, class View_t>
-KOKKOS_INLINE_FUNCTION
-void interpolateVelocity(const double loc[2], 
-                         const Mesh_t &local_mesh,
-		         const View_t u, const View_t v, 
-		         double velocity[NumSpaceDims])
-{
-    Cajita::SplineData<double, 1, NumSpaceDims, FaceI> uspline;
-    Cajita::evaluateSpline(local_mesh, loc, uspline);
-    Cajita::G2P::value(u, uspline, velocity[0]);
-
-    Cajita::SplineData<double, 1, NumSpaceDims, FaceJ> vspline;
-    Cajita::evaluateSpline(local_mesh, loc, vspline);
-    Cajita::G2P::value(v, vspline, velocity[1]);
-}
  
 template <std::size_t NumSpaceDims, class Mesh_t, class View_t>
 KOKKOS_FUNCTION
@@ -81,21 +44,21 @@ void rk3(const double x0[NumSpaceDims],
 	   x2[NumSpaceDims], v2[NumSpaceDims]; 
 
     // Velocity at current location.
-    interpolateVelocity<NumSpaceDims>(x0, local_mesh, u, v, v0);
+    Interpolation::interpolateVelocity<NumSpaceDims, 1>(x0, local_mesh, u, v, v0);
 
     // Velocity half a timestep back
     x1[0] = x0[0] - 0.5*delta_t*v0[0];
     x1[1] = x0[1] - 0.5*delta_t*v0[1];
     if constexpr (NumSpaceDims == 3) 
         x1[2] = x0[2] - 0.5*delta_t*v0[2];
-    interpolateVelocity<NumSpaceDims>(x1, local_mesh, u, v, v1);
+    Interpolation::interpolateVelocity<NumSpaceDims, 1>(x1, local_mesh, u, v, v1);
 
     // Velocity three-quarters of a timestep step back
     x2[0] = x0[0] - 0.75*delta_t*v0[0];
     x2[1] = x0[1] - 0.75*delta_t*v0[1];
     if constexpr (NumSpaceDims == 3) 
         x1[2] = x0[2] - 0.5*delta_t*v0[2];
-    interpolateVelocity<NumSpaceDims>(x2, local_mesh, u, v, v2);
+    Interpolation::interpolateVelocity<NumSpaceDims, 1>(x2, local_mesh, u, v, v2);
 
     // Final location after a timestep
     trace[0] = x0[0] - delta_t*((2.0/9.0)*v0[0] + (3.0/9.0)*v1[0] + (4.0/9.0)*v2[0]);
@@ -138,7 +101,7 @@ void advect(ExecutionSpace &exec_space, ProblemManagerType &pm, double delta_t,
             rk3<NumSpaceDims>(start, local_mesh, u, v, delta_t, trace);
 
             // 3. Interpolate the value of the advected quantity at that location
-            field_next(i, j, 0) = interpolateField<NumSpaceDims>(trace, local_mesh, entity, field_current);
+            field_next(i, j, 0) = Interpolation::interpolateField<NumSpaceDims, 3, Entity_t>(trace, local_mesh, field_current);
         });
 }
 
@@ -180,6 +143,6 @@ void step( const ExecutionSpace& exec_space, ProblemManagerType& pm,
 //---------------------------------------------------------------------------//
 
 } // end namespace TimeIntegrator
-} // end namespace ExaMPM
+} // end namespace CajitaFluids
 
-#endif // EXAMPM_TIMEINTEGRATOR_HPP
+#endif // CAJITAFLUIDS_TIMEINTEGRATOR_HPP

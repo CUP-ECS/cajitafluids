@@ -19,6 +19,7 @@
 #include <Mesh.hpp>
 #include <ProblemManager.hpp>
 #include <BoundaryConditions.hpp>
+#include <Interpolation.hpp>
 
 #include <Kokkos_Core.hpp>
 #include <memory>
@@ -205,17 +206,15 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
                                                   Cajita::Local() );
         auto rhs = _rhs->view();
 
-        // Snce we're not using the Cajita interpolication interface, we have
-        // to halo manually
+	// Get the ghosts we'll need for interpolation
         _pm->gather( FaceI(), Field::Velocity() );
         _pm->gather( FaceJ(), Field::Velocity() );
 
         Kokkos::parallel_for(
             "divergence", createExecutionPolicy( cell_space, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
-                rhs(i, j, 0) = -scale * 
-			(u(i+1, j, 0) - u(i, j, 0) 
-			 + v(i, j+1, 0) - v(i, j, 0));
+	        rhs(i, j, 0) = -scale * (u(i+1, j, 0) - u(i, j, 0) 
+					  + v(i, j+1, 0) - v(i, j, 0));
             });
 #if DEBUG
 	auto rhs_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), rhs);
