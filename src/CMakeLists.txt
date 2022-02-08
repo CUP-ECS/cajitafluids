@@ -2,6 +2,7 @@ set(HEADERS
   BodySource.hpp
   BoundaryConditions.hpp
   InflowSource.hpp
+  Interpolation.hpp
   Mesh.hpp
   ProblemManager.hpp
   SiloWriter.hpp
