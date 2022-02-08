@@ -73,9 +73,10 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
     _rhs = Cajita::createArray<double, MemorySpace>("pressure RHS",
 						    vector_layout);
 
-    // Create a 5-point 2d laplacian stencil.
-    _stencil = {{ 0, 0 }, { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
-    _pressure_solver->setMatrixStencil( _stencil, false );
+    // Create a 5-point 2d laplacian stencil. We save a shared pointer to it 
+    // so we can use it to print 
+    std::vector<std::array<int, 2>> stencil = {{ 0, 0 }, { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
+    _pressure_solver->setMatrixStencil(stencil, false );
 
     // Fill the associated matrix with values
     fillMatrixValues(_pressure_solver);
@@ -147,7 +148,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
   void printMatrixEntries( View_t entry_view )
   {
     auto local_grid = ( _mesh->localGrid() );
-    
+    std::vector<std::array<int, 2>> stencil = {{ 0, 0 }, { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
+
     // Build the solver matrix - set the default entry for each cell
     // then apply the boundary conditions to it
     auto owned_space = local_grid->indexSpace( Cajita::Own(), Cell(), Cajita::Local() );
@@ -162,11 +164,11 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 	std::cout << "(" << i << "," << j << "): ";
 	for (int k = 0; k < owned_space.size(); k++) {
 	  int found = 0;
-	  for (int s = 0; s < _stencil.size(); s++) {
+	  for (int s = 0; s < stencil.size(); s++) {
 	    int iidx = i + owned_space.min(0);
 	    int jidx = j + owned_space.min(1);
-	    int otheri = i + _stencil[s][0],
-	      otherj = j + _stencil[s][1]; 
+	    int otheri = i + stencil[s][0],
+	      otherj = j + stencil[s][1]; 
 	    if ((otheri < 0) || (otherj < 0) 
 		|| (otheri >= owned_space.extent(0))
 		|| (otherj >= owned_space.extent(1))) {
@@ -269,7 +271,6 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 
   }
     private:
-  std::vector<std::array<int, 2>> _stencil;
   std::shared_ptr<cell_array> _lhs;
   std::shared_ptr<cell_array> _rhs;
   BoundaryCondition<2> _bc;
