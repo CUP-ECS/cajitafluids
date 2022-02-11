@@ -88,6 +88,12 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     using memory_space = MemorySpace;
     using execution_space = ExecutionSpace;
     using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
+  
+    using Cell = Cajita::Cell;
+    using FaceI = Cajita::Face<Cajita::Dim::I>;
+    using FaceJ = Cajita::Face<Cajita::Dim::J>;
+    using FaceK = Cajita::Face<Cajita::Dim::K>;
+  
     using cell_array = Cajita::Array<double, Cajita::Cell,
                                      Cajita::UniformMesh<double, 2>, MemorySpace>;
     using iface_array = Cajita::Array<double, Cajita::Face<Cajita::Dim::I>,
@@ -98,8 +104,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     // Meaningless type for now until we have 3D support in.
     using kface_array = Cajita::Array<double, Cajita::Face<Cajita::Dim::K>,
                                       Cajita::UniformMesh<double, 2>, MemorySpace>;
-    using halo = Cajita::Halo<MemorySpace>;
-
+    using halo_type = Cajita::Halo<MemorySpace>;
     using mesh_type = Mesh<2, ExecutionSpace, MemorySpace>;
 
     template <class InitFunc>
@@ -109,9 +114,9 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         : _mesh( mesh )
         // , other initializers
     {
-	// The layouts of our various arrays for values on the staggered mesh and 
-	// other associated data strutures. Do these needto be version with halos 
-	// associuated with them? XXX
+	// The layouts of our various arrays for values on the staggered mesh
+        // and other associated data strutures. Do there need to be version with
+        // halos associuated with them? 
         auto iface_scalar_layout =
             Cajita::createArrayLayout( _mesh->localGrid(), 1, 
                                        Cajita::Face<Cajita::Dim::I>() );
@@ -140,8 +145,9 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         _uj_next = Cajita::createArray<double, MemorySpace>( "uj", jface_scalar_layout);
 
         // Halo patterns for the velocity and quantity halos. These halos are 
-	// used for advection calculations, and are two cells deep as that is the
+	// used for advection calculations, and are two cells deep as that is
 	// the maximum that we allow quantities to advect in a single timestep.
+	// FIXME: Consider customizing these halos for specific fields or uses.
         auto halo_pattern = Cajita::HaloPattern<2>();
         std::vector<std::array<int, 2>> neighbors;
         for ( int i = -2; i < 3; i++ ) {
@@ -313,7 +319,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     };
 
     /**
-     * Make the next version of a field the current one XXX should this zero the next version?
+     * Make the next version of a field the current one 
      * @param Cajita::Cell
      * @param Field::Quantity
      **/
@@ -322,7 +328,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     }
 
     /**
-     * Make the next version of a field the current one XXX should this zero the next version?
+     * Make the next version of a field the current one 
      * @param Cajita::Face<Cajita::DimI>
      * @param Field::Velocity
      **/
@@ -331,7 +337,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     }
 
     /**
-     * Make the next version of a field the current one XXX should this zero the next version?
+     * Make the next version of a field the current one 
      * @param Cajita::Face<Cajita::Dim::J>
      * @param Field::Velocity
      **/
@@ -363,7 +369,13 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         _jface_halo->scatter( ExecutionSpace(), *_uj_curr);
     };
 
-
+    /**
+     * Standard two-deep halo patterns for mesh fields 
+     */
+    std::shared_ptr<halo_type> halo( Cell ) const { return _cell_halo; }
+    std::shared_ptr<halo_type> halo( FaceI ) const { return _iface_halo; }
+    std::shared_ptr<halo_type> halo( FaceJ ) const { return _jface_halo; }
+  
     /**
      * Gather State Data from Neighbors
      * @param Location::Cell
@@ -384,9 +396,9 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     std::shared_ptr<iface_array> _ui_curr, _ui_next;
     std::shared_ptr<jface_array> _uj_curr, _uj_next;
     std::shared_ptr<mesh_type> _mesh; /**< Mesh object */
-    std::shared_ptr<halo> _iface_halo;
-    std::shared_ptr<halo> _jface_halo;
-    std::shared_ptr<halo> _cell_halo;
+    std::shared_ptr<halo_type> _iface_halo;
+    std::shared_ptr<halo_type> _jface_halo;
+    std::shared_ptr<halo_type> _cell_halo;
 };
 
 } // namespace CajitaFluids

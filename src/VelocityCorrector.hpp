@@ -126,7 +126,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
   void fillMatrixValues(std::shared_ptr<reference_solver_type> &solver)
   {
     const auto& matrix_entries = solver->getMatrixValues();
-    initializeMatrixValues(matrix_entries.view());
+    auto m = matrix_entries.view();
+    initializeMatrixValues(m);
 
     // Go ahead and set up a simple diagonal preconditioner for the reference solver now
     std::vector<std::array<int, 2>> diag_stencil = { { 0, 0 } };
@@ -136,11 +137,12 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
     auto owned_space = local_grid->indexSpace( Cajita::Own(), Cell(), Cajita::Local() );
     auto preconditioner_view = preconditioner_entries.view();
     auto scale = _dt / (_density * _mesh->cellSize() * _mesh->cellSize());
+
     Kokkos::parallel_for(
 			 "fill_preconditioner_entries",
 			 createExecutionPolicy( owned_space, ExecutionSpace() ),
 			 KOKKOS_LAMBDA( const int i, const int j ) {
-			   preconditioner_view( i, j, 0 ) = 1.0 / (4.0 * scale);
+			   preconditioner_view( i, j, 0 ) = 1.0 / m(i, j, 0);
 			 } );
   }
 
@@ -248,8 +250,13 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
         auto cell_space = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(),
                                                   Cajita::Local() );
 
-	/* Now apply the LHS to adjust the velocity field. XXX Do we need to 
-	 * halo the lhs here??? XXX */
+	/* Now apply the LHS to adjust the velocity field. We need to
+	 * halo the lhs here to adjut edge velocities. This halo is
+	 * strictly larger than needed (only needs to be 1 deep and
+	 * not include corners), but we reuse the exiting halo
+	 * pattern for simplicity. */
+	_pm->halo(Cell())->gather( ExecutionSpace(), *_lhs);
+	
         Kokkos::parallel_for(
             "apply pressure", createExecutionPolicy( cell_space, ExecutionSpace() ),
             KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
@@ -277,6 +284,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
   std::shared_ptr<pm_type> _pm;
   std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
   std::shared_ptr<SparseSolver> _pressure_solver;
+  
   double _dt;
   double _density;
 };
