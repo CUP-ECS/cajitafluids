@@ -139,10 +139,10 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
                                                                   cell_scalar_layout);
 	
 	// 2. The magnitudes of the velocities normal to the cell faces
-        _ui_curr = Cajita::createArray<double, MemorySpace>( "ui", iface_scalar_layout);
-        _ui_next = Cajita::createArray<double, MemorySpace>( "ui", iface_scalar_layout);
-        _uj_curr = Cajita::createArray<double, MemorySpace>( "uj", jface_scalar_layout);
-        _uj_next = Cajita::createArray<double, MemorySpace>( "uj", jface_scalar_layout);
+        _ui_curr = Cajita::createArray<double, MemorySpace>( "u0", iface_scalar_layout);
+        _ui_next = Cajita::createArray<double, MemorySpace>( "u1", iface_scalar_layout);
+        _uj_curr = Cajita::createArray<double, MemorySpace>( "v0", jface_scalar_layout);
+        _uj_next = Cajita::createArray<double, MemorySpace>( "v1", jface_scalar_layout);
 
         // Halo patterns for the velocity and quantity halos. These halos are 
 	// used for advection calculations, and are two cells deep as that is
@@ -157,6 +157,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
                 }
             }
         }
+        halo_pattern.setNeighbors( neighbors );
 
         _iface_halo = Cajita::createHalo<double, MemorySpace>(
             *iface_scalar_layout, halo_pattern );

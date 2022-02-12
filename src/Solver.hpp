@@ -88,7 +88,8 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             ExecutionSpace(), _mesh, create_functor );
 
 	// Create a velocity corrector to enforce incompressibility
-	_vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>( _pm, _bc, _density, _dt, "Reference", "Diagonal");
+	//_vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>( _pm, _bc, _density, _dt, "Reference", "Diagonal");
+	_vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>( _pm, _bc, _density, _dt, "PFMG", "None");
 
         // Set up Silo for I/O
         _silo = std::make_shared<SiloWriter<2, ExecutionSpace, MemorySpace>>( _pm );

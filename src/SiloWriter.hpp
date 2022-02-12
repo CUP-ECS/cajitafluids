@@ -16,6 +16,7 @@
 
 // Include Statements
 #include <Cajita.hpp>
+#include <Interpolation.hpp>
 
 #include <pmpio.h>
 #include <silo.h>
@@ -116,91 +117,48 @@ class SiloWriter {
         auto q = _pm->get( Cajita::Cell(), Field::Quantity(), Version::Current() );
 	auto xmin = cell_domain.min(0);
 	auto ymin = cell_domain.min(1);
-        Kokkos::View<typename pm_type::cell_array::value_type***, Kokkos::LayoutLeft,
-		     typename pm_type::cell_array::device_type> 
+        Kokkos::View<typename pm_type::cell_array::value_type***, 
+                     Kokkos::LayoutRight, 
+                     typename pm_type::cell_array::device_type> 
             qOwned("qowned", cell_domain.extent(0), cell_domain.extent(1), 1);
 	Kokkos::parallel_for( 
             "SiloWriter::qowned copy", 
             createExecutionPolicy( cell_domain, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
-	        qOwned(i - xmin, j - ymin, 0) = q(i, j, 0);
-            });
-        auto qHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), qOwned );
+           KOKKOS_LAMBDA( const int i, const int j ) {
+	      qOwned(i - xmin, j - ymin, 0) = q(i, j, 0);
+           });
+        auto qHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
+                                                          qOwned );
 
         DBPutQuadvar1( dbfile, "quantity", meshname, qHost.data(), zdims, Dims,
                        NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
 
         auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), Version::Current() );
         auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), Version::Current() );
-#ifdef EDGE_VOLICITY_IO
-        // Velocity faces need to be in a single array, ordered by i then j
-	// edges. i-faces in 2D are j-oriented edges, so we do v then u. In 
-        // addition, each subportion of this array is also padded out to be 
-	// dim[0] by dim[1] in size for Silo.
-        
-	double *velocities = (double *)malloc(sizeof(double) * dims[0] * dims[1] * Dims );
+	
+        /* Because VisIt and all the other things that read Silo files 
+         * can't currently show edge velocity magnitudes, we 
+         * instead interpolate to cell-centered velcity vectors for I/O */
 
-	// Copy the v velocity face values to a row-major view on the 
-	// host and then into the array. Note that we have to pad this out
-	// to be dims[0] * dims[1] in size.
-        Kokkos::View<typename pm_type::jface_array::value_type***, Kokkos::LayoutLeft,
-		     typename pm_type::jface_array::device_type> 
-            vOwned("vowned", dims[0], dims[1], 1);
-        auto jface_domain = local_grid->indexSpace( Cajita::Own(), 
-            Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
-	Kokkos::parallel_for( 
-            "SiloWriter::vowned copy", 
-            createExecutionPolicy( jface_domain, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
-	        vOwned(i - xmin, j - ymin, 0) = v(i, j, 0);
-            });
-        auto vHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
-                                                          vOwned );
-	memcpy(velocities, vHost.data(), dims[0] * dims[1] * sizeof(double));
-
-	// Now move the v velocity faces to the array the same way.
-
-	// The view is size dims[0] by dims[1] but the parallel loop to
-	// copy into it iterates over the space of edge indicies
-        Kokkos::View<typename pm_type::iface_array::value_type***, Kokkos::LayoutLeft,
-		     typename pm_type::iface_array::device_type> 
-            uOwned("uowned", dims[0], dims[1], 1);
-        auto iface_domain = local_grid->indexSpace( Cajita::Own(), 
-            Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
-	Kokkos::parallel_for( 
-            "SiloWriter::uowned copy", 
-            createExecutionPolicy( iface_domain, ExecutionSpace() ),
-            KOKKOS_LAMBDA( const int i, const int j ) {
-	        uOwned(i - xmin, j - ymin, 0) = u(i, j, 0);
-            });
-        auto uHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
-							  uOwned);
-	memcpy(velocities + dims[0] * dims[1], uHost.data(), 
-               dims[0] * dims[1] * sizeof(double));
-
-	// Finally write the velocity faces to the output file. Again, this is 
-        // true edge-centered data, so it wants the number of nodes, not zones.
-        DBPutQuadvar1( dbfile, "velocity", meshname, velocities, dims, Dims,
-                       NULL, 0, DB_DOUBLE, DB_EDGECENT, optlist );
-
-        // Free Coordinate and State Arrays for Writing
-	free(velocities);
-#else
-	/* Because VisIt can't currently show edge velocity magnitudes, we instead interpolate
-	 * to cell-centered velcity vectors for I/O */
-
-	Kokkos::View<typename pm_type::cell_array::value_type***, Kokkos::LayoutLeft,
+	Kokkos::View<typename pm_type::cell_array::value_type***, 
+                     Kokkos::LayoutRight,
                      typename pm_type::cell_array::device_type>
             uOwned("uOwned", cell_domain.extent(0), cell_domain.extent(1), 1);
-	Kokkos::View<typename pm_type::cell_array::value_type***, Kokkos::LayoutLeft,
+	Kokkos::View<typename pm_type::cell_array::value_type***, 
+                     Kokkos::LayoutRight,
                      typename pm_type::cell_array::device_type>
             vOwned("vOwned", cell_domain.extent(0), cell_domain.extent(1), 1);
         Kokkos::parallel_for(
-            "SiloWriter::qowned copy",
+            "SiloWriter::velocity interpolate and copy",
             createExecutionPolicy( cell_domain, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
-                uOwned(i - xmin, j - ymin, 0) = (u(i, j, 0) + u(i + 1, j, 0)) / 2;
-                vOwned(i - xmin, j - ymin, 0) = (v(i, j, 0) + v(i, j + 1, 0)) / 2;
+                int idx[2] = {i, j};
+                double loc[2], velocity[2];
+                local_mesh.coordinates( Cajita::Cell(), idx, loc );
+		Interpolation::interpolateVelocity<2, 1>(loc, local_mesh, 
+					  u, v, velocity);
+                uOwned(i - xmin, j - ymin, 0) = velocity[0];
+                vOwned(i - xmin, j - ymin, 0) = velocity[1];
             });
         auto uHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), uOwned );
         auto vHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), vOwned );
@@ -209,7 +167,6 @@ class SiloWriter {
 	vars[1] = vHost.data();
         DBPutQuadvar( dbfile, "velocity", meshname, Dims, (DBCAS_t)varnames, vars, zdims, 
                       Dims, NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist);
-#endif
 
 	for (int i = 0; i < Dims; i++) {
             free(coords[i]);

@@ -296,8 +296,8 @@ createVelocityCorrector( const std::shared_ptr<ProblemManagerType> &pm,
 			 BoundaryConditionType &bc,
 			 const double density,
 			 const double delta_t, 
-			 const char *solver, 
-			 const char *precon) 
+			 std::string solver, 
+			 std::string precon) 
 {
     using mesh_type = Cajita::UniformMesh<double, 2>;
     using hypre_solver_type = Cajita::HypreStructuredSolver<double, Cajita::Cell, MemorySpace>;
@@ -305,7 +305,7 @@ createVelocityCorrector( const std::shared_ptr<ProblemManagerType> &pm,
 
       auto vector_layout =
 	Cajita::createArrayLayout( pm->mesh()->localGrid(), 1, Cajita::Cell() );
-    if (strcmp(solver, "Reference") == 0) {
+    if (solver.compare("Reference") == 0) {
       auto ps = Cajita::createReferenceConjugateGradient<double, 
 							 MemorySpace>( *vector_layout );
       // The velocity corrector will create the relevant preconditioner here 
@@ -316,9 +316,11 @@ createVelocityCorrector( const std::shared_ptr<ProblemManagerType> &pm,
     } else { 
       auto ps = Cajita::createHypreStructuredSolver<double, 
 						    MemorySpace>( solver, *vector_layout );
-      auto preconditioner = Cajita::createHypreStructuredSolver<double,
+      if (precon.compare("None") != 0 && precon.compare("none") != 0) {
+          auto preconditioner = Cajita::createHypreStructuredSolver<double,
 								MemorySpace>( precon, *vector_layout, true );
-      ps->setPreconditioner(preconditioner);
+          ps->setPreconditioner(preconditioner);
+      }
       return std::make_shared<CajitaFluids::VelocityCorrector<NumSpaceDims, ExecutionSpace, MemorySpace, hypre_solver_type>>(pm, bc, ps, density, delta_t);
     }
 }
