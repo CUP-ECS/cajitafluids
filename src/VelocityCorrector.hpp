@@ -66,25 +66,34 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
   {
     _mesh = pm->mesh();
 
+    // Create the LHS and RHS vectors used calculate pressure correction amount 
+    // at each cell
     auto vector_layout = Cajita::createArrayLayout( _mesh->localGrid(), 1, Cell() );
-    
     _lhs = Cajita::createArray<double, MemorySpace>("pressure LHS",
 						    vector_layout);
     _rhs = Cajita::createArray<double, MemorySpace>("pressure RHS",
 						    vector_layout);
 
-    // Create a 5-point 2d laplacian stencil. We save a shared pointer to it 
-    // so we can use it to print 
+    // Set up the solver to compute the pressure at each point using a 5-point 
+    // 2d laplacian stencil. The matrix itself will have 0 weights for elements
+    // that fall outside the boundary, set up by the boundary condition object. 
     std::vector<std::array<int, 2>> stencil = {{ 0, 0 }, { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
     _pressure_solver->setMatrixStencil(stencil, false );
 
-    // Fill the associated matrix with values
+    // Fill the associated matrix assocuated with with values
     fillMatrixValues(_pressure_solver);
 
     _pressure_solver->setTolerance ( 1.0e-6 );
     _pressure_solver->setMaxIter ( 2000 );
     _pressure_solver->setPrintLevel( 1 );
     _pressure_solver->setup();
+
+    // Finally, we need to halo pressure values with neighbors with whom
+    // we share a face so that we can correct velocities on those faces. Note
+    // that this is a much simpler and shallow halo poattern than the ones
+    // used for advection.
+    _pressure_halo = Cajita::createHalo<double, MemorySpace>(
+                                 *vector_layout, Cajita::FaceHaloPattern<2>() );
   }
 
   template <class View_t> 
@@ -251,11 +260,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
                                                   Cajita::Local() );
 
 	/* Now apply the LHS to adjust the velocity field. We need to
-	 * halo the lhs here to adjut edge velocities. This halo is
-	 * strictly larger than needed (only needs to be 1 deep and
-	 * not include corners), but we reuse the exiting halo
-	 * pattern for simplicity. */
-	_pm->halo(Cell())->gather( ExecutionSpace(), *_lhs);
+	 * halo the lhs here to adjust edge velocities. */
+	_pressure_halo->gather( ExecutionSpace(), *_lhs);
 	
         Kokkos::parallel_for(
             "apply pressure", createExecutionPolicy( cell_space, ExecutionSpace() ),
@@ -284,6 +290,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
   std::shared_ptr<pm_type> _pm;
   std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
   std::shared_ptr<SparseSolver> _pressure_solver;
+  std::shared_ptr<Cajita::Halo<MemorySpace>> _pressure_halo;
   
   double _dt;
   double _density;
