@@ -71,6 +71,10 @@ class SiloWriter {
         DBAddOption( optlist, DBOPT_CYCLE, &time_step );
         DBAddOption( optlist, DBOPT_TIME, &time );
         DBAddOption( optlist, DBOPT_DTIME, &dt );
+        int dbcoord = DB_CARTESIAN;
+        DBAddOption( optlist, DBOPT_COORDSYS, &dbcoord );
+	int dborder = DB_ROWMAJOR;
+	DBAddOption( optlist, DBOPT_MAJORORDER, &dborder );
 
         // Get the size of the local cell space and declare the 
 	// coordinates of the portion of the mesh we're writing
@@ -81,10 +85,6 @@ class SiloWriter {
             dims[i] = zdims[i] + 1; // nodes in a dimension
             spacing[i] = _pm->mesh()->cellSize(); // uniform mesh
         }
-
-        // Coordinate Names: Cartesian X/Y/Z Coordinate System
-	for (int i = 0; i < Dims; i++) {
-	}
 
         // Allocate coordinate arrays in each dimension
 	for (int i = 0; i < Dims; i++) {
@@ -108,7 +108,7 @@ class SiloWriter {
         DBPutQuadmesh( dbfile, meshname, (DBCAS_t)coordnames,
                        coords, dims, Dims, DB_DOUBLE, DB_COLLINEAR, optlist );
 
-	// Now we write the individual variables assocuated with this 
+	// Now we write the individual variables associated with this 
 	// portion of the mesh, potentially copying them out of device space
  	// and making sure not to write ghost values.
 
@@ -117,8 +117,12 @@ class SiloWriter {
         auto q = _pm->get( Cajita::Cell(), Field::Quantity(), Version::Current() );
 	auto xmin = cell_domain.min(0);
 	auto ymin = cell_domain.min(1);
+
+        // Silo is expecting row-major data so we make this a LayoutRight
+        // array that we copy data into and then get a mirror view of.
+        // XXX WHY DOES THIS ONLY WORK LAYOUTLEFT?
         Kokkos::View<typename pm_type::cell_array::value_type***, 
-                     Kokkos::LayoutRight, 
+                     Kokkos::LayoutLeft, 
                      typename pm_type::cell_array::device_type> 
             qOwned("qowned", cell_domain.extent(0), cell_domain.extent(1), 1);
 	Kokkos::parallel_for( 
@@ -126,7 +130,7 @@ class SiloWriter {
             createExecutionPolicy( cell_domain, ExecutionSpace() ),
            KOKKOS_LAMBDA( const int i, const int j ) {
 	      qOwned(i - xmin, j - ymin, 0) = q(i, j, 0);
-           });
+		   });
         auto qHost = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
                                                           qOwned );
 
@@ -139,13 +143,13 @@ class SiloWriter {
         /* Because VisIt and all the other things that read Silo files 
          * can't currently show edge velocity magnitudes, we 
          * instead interpolate to cell-centered velcity vectors for I/O */
-
+        // XXX Why does this only work LayoutLeft???
 	Kokkos::View<typename pm_type::cell_array::value_type***, 
-                     Kokkos::LayoutRight,
+                     Kokkos::LayoutLeft,
                      typename pm_type::cell_array::device_type>
             uOwned("uOwned", cell_domain.extent(0), cell_domain.extent(1), 1);
 	Kokkos::View<typename pm_type::cell_array::value_type***, 
-                     Kokkos::LayoutRight,
+                     Kokkos::LayoutLeft,
                      typename pm_type::cell_array::device_type>
             vOwned("vOwned", cell_domain.extent(0), cell_domain.extent(1), 1);
         Kokkos::parallel_for(
