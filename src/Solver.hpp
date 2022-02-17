@@ -79,6 +79,20 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             global_bounding_box, global_num_cell, partitioner,
             _halo_min, comm );
 	
+        // Check that our timestep is small enough to handle the mesh size 
+        // given and inflow/body forces under some very simple assumptions.
+        // In the end, the user should give us sane input conditions.
+        auto forcemax = sqrt(body._force[0]*body._force[0]
+                             + body._force[1]*body._force[1]);
+        auto umax = fmax(fabs(source._velocity[0]), fabs(source._velocity[1])) + 
+		    sqrt(forcemax* _mesh->cellSize());
+        if ((umax > 0) 
+            && (_dt > _mesh->cellSize()/umax)) {
+	    _dt = _mesh->cellSize()/umax;
+            std::cerr << "Reducting timestep to " << _dt
+                      <<  " given mesh size and inflow velocity.\n"; 
+        } 
+
 	// Put domain rane information into the boundary condition object
 	_bc.min = _mesh->minDomainGlobalCellIndex();
         _bc.max = _mesh->maxDomainGlobalCellIndex();
