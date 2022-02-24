@@ -17,6 +17,9 @@ set(SOURCES
 
 add_library(cajitafluids ${SOURCES})
 
+# We use C++ 17 features (if constexpr)
+target_compile_features(cajitafluids PUBLIC cxx_std_17)
+
 target_link_libraries(cajitafluids
   Cabana::cabanacore
   Cabana::Cajita

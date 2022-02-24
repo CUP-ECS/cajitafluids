@@ -1,5 +1,5 @@
 # project settings
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.18)
 
 project(CajitaFluids LANGUAGES C CXX VERSION 0.1.0)
 
@@ -22,9 +22,7 @@ if( NOT Cabana_ENABLE_CAJITA )
   message( FATAL_ERROR "Cabana must be compiled with Cajita" )
 endif()
 find_package(Silo REQUIRED)
-
-# find Clang Format
-find_package( CLANG_FORMAT 10 )
+find_package(CUDAToolkit)
 
 # library
 add_subdirectory(src)

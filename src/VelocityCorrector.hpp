@@ -99,9 +99,11 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
     auto l2g = Cajita::IndexConversion::createL2G( *( _mesh->localGrid() ),
 						   Cell());
     auto scale = _dt / (_density * _mesh->cellSize() * _mesh->cellSize());
+    const bc_type &bc = _bc;
+
     Kokkos::parallel_for("fill_matrix_entries",
 			 createExecutionPolicy( owned_space, ExecutionSpace() ),
-			 KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+			 KOKKOS_LAMBDA( const int i, const int j ) {
 			   int gi, gj;
 			   l2g(i, j, gi, gj);
 			   entry_view( i, j, 0 ) = 4.0*scale;
@@ -109,7 +111,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 			   entry_view( i, j, 2 ) = -1.0*scale;
 			   entry_view( i, j, 3 ) = -1.0*scale;
 			   entry_view( i, j, 4 ) = -1.0*scale;
-			   _bc.build_matrix(gi, gj, i, j, entry_view, scale);
+			   bc.build_matrix(gi, gj, i, j, entry_view, scale);
 			 });
   }
 
@@ -256,16 +258,18 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 	 * not include corners), but we reuse the exiting halo
 	 * pattern for simplicity. */
 	_pm->halo(Cell())->gather( ExecutionSpace(), *_lhs);
-	
+
+	const bc_type &bc = _bc;
+
         Kokkos::parallel_for(
             "apply pressure", createExecutionPolicy( cell_space, ExecutionSpace() ),
-            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+            KOKKOS_LAMBDA( const int i, const int j ) {
                 u(i, j, 0) -= scale * (p(i, j, 0) - p(i-1, j  , 0));
                 v(i, j, 0) -= scale * (p(i, j, 0) - p(i,   j-1, 0));
 
 		int gi, gj;
                 l2g(i, j, gi, gj); 
-		_bc.apply_pressure(gi, gj, i, j, u, v, scale);
+		bc.apply_pressure(gi, gj, i, j, u, v, scale);
             });
     }
 

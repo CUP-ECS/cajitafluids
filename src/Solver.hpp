@@ -140,45 +140,52 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
         auto owned_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
+        // Create local variable versions of the class members to avoid needing to use a
+        // (potentially expensive) class lambda
+        //const BoundaryCondition<2> &bc = _bc;
+	const InflowSource<2> &source = _source;
+	const BodyForce<2> &body = _body;
+        const auto delta_t = _dt;
+
         auto quantity = _pm->get( Cell(), Field::Quantity(), Version::Current() );
         Kokkos::parallel_for( "add external quantity",
             createExecutionPolicy( owned_cells, ExecutionSpace() ),
-            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+            KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
 		double loc[2];
 	        local_mesh.coordinates( Cell(), idx, loc);
 		double x = loc[0],
 		       y = loc[1];
-                _source(Cajita::Cell(), quantity, i, j, x, y, _dt, cell_area);
-                _body(Cajita::Cell(), quantity, i, j, x, y, _dt, cell_area);
+                source(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
+                body(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
             });
 
         auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
         auto ui  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
         Kokkos::parallel_for( "add external x velocity",
             createExecutionPolicy( owned_ifaces, ExecutionSpace() ),
-            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+            KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
 		double loc[2];
 	        local_mesh.coordinates( FaceI(), idx, loc);
 		double x = loc[0],
 		       y = loc[1];
-                _source(FaceI(), ui, i, j, x, y, _dt, cell_area);
-                _body(FaceI(), ui, i, j, x, y, _dt, cell_area);
+                source(FaceI(), ui, i, j, x, y, delta_t, cell_area);
+                body(FaceI(), ui, i, j, x, y, delta_t, cell_area);
             });
 
         auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
         auto uj  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
         Kokkos::parallel_for( "add external y velocity",
             createExecutionPolicy( owned_jfaces, ExecutionSpace() ),
-            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+            KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
 		double loc[2];
 	        local_mesh.coordinates( FaceJ(), idx, loc);
 		double x = loc[0],
 		       y = loc[1];
-                _source(FaceJ(), uj, i, j, x, y, _dt, cell_area);
-                _body(FaceJ(), uj, i, j, x, y, _dt, cell_area);
+                source(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
+                body(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
             });
     }
 

@@ -1,10 +1,11 @@
 # Spack environment specification for code needed to run ExaCLAMR on non-CUDA systems.
 spack:
   specs:
-  - hdf5+mpi
-  - openmpi@4.0.5
+  - hdf5+mpi %gcc@8.3.1
   - silo@4.11
-  - kokkos std=17 +hwloc +cuda +wrapper -numactl
   - cabana +hypre +heffte +mpi
+  - heffte @2.0.0 cuda_arch=70
+  - kokkos+cuda+debug+debug_bounds_check+hwloc~numactl+wrapper+cuda_lambda cuda_arch=70
+    std=17 %gcc@8.3.1
   concretization: together
   view: true

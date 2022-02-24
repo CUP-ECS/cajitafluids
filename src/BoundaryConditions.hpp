@@ -84,16 +84,20 @@ template <> struct BoundaryCondition<2> {
 						    UType &u, VType &v,
                                                     const double scale ) const {
 	    // Force velocity at solid boundaries to be 0.
-            if ( ( ( gi <= min[0] )  && ( boundary_type[0] == BoundaryType::SOLID ) )
-		 || ( ( gi > max[0] - 1 )  && ( boundary_type[2] == BoundaryType::SOLID ) ) ) {
+            if ( ( gi <= min[0] )  && ( boundary_type[0] == BoundaryType::SOLID ) ) {
 	        u(i, j, 0) = 0;
             }
-            if ( ( ( gj <= min[1] ) && ( boundary_type[1] == BoundaryType::SOLID ) )
-                 || ( ( gj > max[1] - 1 )  && ( boundary_type[3] == BoundaryType::SOLID ) ) ) {
+            if  (( gi >= max[0] )  && ( boundary_type[2] == BoundaryType::SOLID ) ) {
+	        u(i+1, j, 0) = 0;
+            }
+            if ( ( gj <= min[1] ) && ( boundary_type[1] == BoundaryType::SOLID ) ) {
 	        v(i, j, 0) = 0;
+            }
+            if ( ( gj >= max[1] )  && ( boundary_type[3] == BoundaryType::SOLID ) ) {
+	        v(i, j + 1, 0) = 0;
 	    }
         }
-
+        
         Kokkos::Array<int, 4> boundary_type; /**< Boundary condition type on all walls  */
         Kokkos::Array<int, 2> min;
         Kokkos::Array<int, 2> max;
