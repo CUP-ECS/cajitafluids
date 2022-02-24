@@ -41,8 +41,12 @@ struct BoundaryType {
 template <std::size_t NumSpaceDim> struct BoundaryCondition;
 
 // Note that we loop over teh entire domain here so that later code, which might have geometry
-// inside the domain, could use the same approach.
+// inside the domain, could use the same approach. This code is all cell-centric, not 
+// face centric for the moment.
 template <> struct BoundaryCondition<2> {
+        using Cell = Cajita::Cell;
+        using FaceI = Cajita::Face<Cajita::Dim::I>;
+        using FaceJ = Cajita::Face<Cajita::Dim::J>;
         template <class ArrayType>
         KOKKOS_INLINE_FUNCTION void build_matrix( const int gi, const int gj, 
 						  const int i, const int j, 
@@ -78,22 +82,54 @@ template <> struct BoundaryCondition<2> {
             }
         }
 
-        template <class UType, class VType>
-        KOKKOS_INLINE_FUNCTION void apply_pressure( const int gi, const int gj,
-						    const int i, const int j, 
-						    UType &u, VType &v,
-                                                    const double scale ) const {
-	    // Force velocity at solid boundaries to be 0.
-            if ( ( ( gi <= min[0] )  && ( boundary_type[0] == BoundaryType::SOLID ) )
-		 || ( ( gi > max[0] - 1 )  && ( boundary_type[2] == BoundaryType::SOLID ) ) ) {
+        // The functor operator applies velocity boundary conditions. Note that the maxes in the 
+        // bounding box are in terms of global *cell* indexes, not face indexes. As result the comparisons
+        // end up being slighty different.
+        template <class UType>
+        KOKKOS_INLINE_FUNCTION void operator()( FaceI, UType &u,
+                                                const int gi, const int gj,
+                                                const int i, const int j ) const {
+            if ( ( gi <= min[0] )  && ( boundary_type[0] == BoundaryType::SOLID ) 
+                  ) {
 	        u(i, j, 0) = 0;
             }
-            if ( ( ( gj <= min[1] ) && ( boundary_type[1] == BoundaryType::SOLID ) )
-                 || ( ( gj > max[1] - 1 )  && ( boundary_type[3] == BoundaryType::SOLID ) ) ) {
+            if  (( gi > max[0] )  && ( boundary_type[2] == BoundaryType::SOLID ) ) {
+	        u(i, j, 0) = 0;
+            }
+        }
+        template <class VType>
+        KOKKOS_INLINE_FUNCTION void operator()( FaceJ, VType &v,
+                                                const int gi, const int gj,
+					        const int i, const int j ) const
+        {
+            if ( ( gj <= min[1] ) && ( boundary_type[1] == BoundaryType::SOLID ) ) {
+	        v(i, j, 0) = 0;
+            }
+            if ( ( gj >= max[1] )  && ( boundary_type[3] == BoundaryType::SOLID ) ) {
 	        v(i, j, 0) = 0;
 	    }
         }
 
+        template <class UType, class VType>
+        KOKKOS_INLINE_FUNCTION void operator()( Cell, UType &u, VType &v,
+                                                const int gi, const int gj,
+					        const int i, const int j ) const 
+        {
+	    // Force face velocity at cells on solid boundaries to be 0.
+            if ( ( gi <= min[0] )  && ( boundary_type[0] == BoundaryType::SOLID ) ) {
+	        u(i, j, 0) = 0;
+            }
+            if ( ( gi >= max[0] - 1 )  && ( boundary_type[2] == BoundaryType::SOLID ) ) {
+	        u(i+1, j, 0) = 0;
+            }
+            if ( ( gj <= min[1] ) && ( boundary_type[1] == BoundaryType::SOLID ) ) {
+	        v(i, j, 0) = 0;
+            }
+            if ( ( gj >= max[1] - 1 )  && ( boundary_type[3] == BoundaryType::SOLID ) ) {
+	        v(i, j + 1, 0) = 0;
+	    }
+        }
+        
         Kokkos::Array<int, 4> boundary_type; /**< Boundary condition type on all walls  */
         Kokkos::Array<int, 2> min;
         Kokkos::Array<int, 2> max;

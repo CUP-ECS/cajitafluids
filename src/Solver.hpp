@@ -70,7 +70,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 	    const InflowSource<2> &source,
             const BodyForce<2> &body,
             const double delta_t )
-        : _halo_min( 2 ), _density(density), _bc(bc), 
+        : _halo_min( 3 ), _density(density), _bc(bc), 
 	  _source(source), _body(body), _dt( delta_t)
     {
 
@@ -79,6 +79,20 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             global_bounding_box, global_num_cell, partitioner,
             _halo_min, comm );
 	
+        // Check that our timestep is small enough to handle the mesh size
+        // given and inflow/body forces under some very simple assumptions.
+        // In the end, the user should give us sane input conditions.
+        auto forcemax = sqrt(body._force[0]*body._force[0]
+                             + body._force[1]*body._force[1]);
+        auto umax = fmax(fabs(source._velocity[0]), fabs(source._velocity[1])) +
+                    sqrt(forcemax* _mesh->cellSize());
+        if ((umax > 0)
+            && (_dt > _mesh->cellSize()/umax)) {
+            _dt = _mesh->cellSize()/umax;
+            std::cerr << "Reducting timestep to " << _dt
+                      <<  " given mesh size and inflow velocity.\n";
+        }
+
 	// Put domain rane information into the boundary condition object
 	_bc.min = _mesh->minDomainGlobalCellIndex();
         _bc.max = _mesh->maxDomainGlobalCellIndex();
@@ -88,7 +102,6 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             ExecutionSpace(), _mesh, create_functor );
 
 	// Create a velocity corrector to enforce incompressibility
-	//_vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>( _pm, _bc, _density, _dt, "Reference", "Diagonal");
 	_vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>( _pm, _bc, _density, _dt, "PFMG", "None");
 
         // Set up Silo for I/O
@@ -140,45 +153,61 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
         auto owned_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
+        // Create local variable versions of the class members to avoid needing to use a
+        // (potentially expensive) class lambda
+	const BoundaryCondition<2> &bc = _bc;
+	const InflowSource<2> &source = _source;
+	const BodyForce<2> &body = _body;
+        const auto delta_t = _dt;
+
         auto quantity = _pm->get( Cell(), Field::Quantity(), Version::Current() );
         Kokkos::parallel_for( "add external quantity",
             createExecutionPolicy( owned_cells, ExecutionSpace() ),
-            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+            KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
 		double loc[2];
 	        local_mesh.coordinates( Cell(), idx, loc);
-		double x = loc[0],
-		       y = loc[1];
-                _source(Cajita::Cell(), quantity, i, j, x, y, _dt, cell_area);
-                _body(Cajita::Cell(), quantity, i, j, x, y, _dt, cell_area);
+		double x = loc[0], y = loc[1];
+
+                source(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
+                body(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
             });
 
         auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
         auto ui  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
+        auto l2g_facei = Cajita::IndexConversion::createL2G( local_grid, FaceI());
+
         Kokkos::parallel_for( "add external x velocity",
             createExecutionPolicy( owned_ifaces, ExecutionSpace() ),
-            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+            KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
+                int gi, gj;
 		double loc[2];
 	        local_mesh.coordinates( FaceI(), idx, loc);
-		double x = loc[0],
-		       y = loc[1];
-                _source(FaceI(), ui, i, j, x, y, _dt, cell_area);
-                _body(FaceI(), ui, i, j, x, y, _dt, cell_area);
+		double x = loc[0], y = loc[1];
+
+                l2g_facei(i, j, gi, gj);
+                source(FaceI(), ui, i, j, x, y, delta_t, cell_area);
+                body(FaceI(), ui, i, j, x, y, delta_t, cell_area);
+                bc(FaceI(), ui, gi, gj, i, j);
             });
 
         auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
         auto uj  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
+        auto l2g_facej = Cajita::IndexConversion::createL2G( local_grid, FaceJ());
         Kokkos::parallel_for( "add external y velocity",
             createExecutionPolicy( owned_jfaces, ExecutionSpace() ),
-            KOKKOS_CLASS_LAMBDA( const int i, const int j ) {
+            KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
+                int gi, gj;
 		double loc[2];
 	        local_mesh.coordinates( FaceJ(), idx, loc);
-		double x = loc[0],
-		       y = loc[1];
-                _source(FaceJ(), uj, i, j, x, y, _dt, cell_area);
-                _body(FaceJ(), uj, i, j, x, y, _dt, cell_area);
+		double x = loc[0], y = loc[1];
+
+                l2g_facej(i, j, gi, gj);
+                source(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
+                body(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
+                bc(FaceI(), uj, gi, gj, i, j);
             });
     }
 

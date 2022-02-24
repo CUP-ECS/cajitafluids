@@ -52,7 +52,7 @@ template <> struct BodyForce<2> {
 
         BodyForce(double fx, double fy) { _force[0] = fx; _force[1] = fy; }
         
-	Kokkos::Array<double, 2> _force;      /**< Velocity of inflow quantity */
+	Kokkos::Array<double, 2> _force;  /**< Force exerted on all cells. */
     };
 } // namespace CajitaFluids
 
