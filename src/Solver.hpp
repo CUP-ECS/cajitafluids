@@ -142,7 +142,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
         // Create local variable versions of the class members to avoid needing to use a
         // (potentially expensive) class lambda
-        //const BoundaryCondition<2> &bc = _bc;
+	const BoundaryCondition<2> &bc = _bc;
 	const InflowSource<2> &source = _source;
 	const BodyForce<2> &body = _body;
         const auto delta_t = _dt;
@@ -154,38 +154,47 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 		int idx[2] = {i, j};
 		double loc[2];
 	        local_mesh.coordinates( Cell(), idx, loc);
-		double x = loc[0],
-		       y = loc[1];
+		double x = loc[0], y = loc[1];
+
                 source(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
                 body(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
             });
 
         auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
         auto ui  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
+        auto l2g_facei = Cajita::IndexConversion::createL2G( local_grid, FaceI());
+
         Kokkos::parallel_for( "add external x velocity",
             createExecutionPolicy( owned_ifaces, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
+                int gi, gj;
 		double loc[2];
 	        local_mesh.coordinates( FaceI(), idx, loc);
-		double x = loc[0],
-		       y = loc[1];
+		double x = loc[0], y = loc[1];
+
+                l2g_facei(i, j, gi, gj);
                 source(FaceI(), ui, i, j, x, y, delta_t, cell_area);
                 body(FaceI(), ui, i, j, x, y, delta_t, cell_area);
+                bc(FaceI(), ui, gi, gj, i, j);
             });
 
         auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
         auto uj  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
+        auto l2g_facej = Cajita::IndexConversion::createL2G( local_grid, FaceJ());
         Kokkos::parallel_for( "add external y velocity",
             createExecutionPolicy( owned_jfaces, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
+                int gi, gj;
 		double loc[2];
 	        local_mesh.coordinates( FaceJ(), idx, loc);
-		double x = loc[0],
-		       y = loc[1];
+		double x = loc[0], y = loc[1];
+
+                l2g_facej(i, j, gi, gj);
                 source(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
                 body(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
+                bc(FaceI(), uj, gi, gj, i, j);
             });
     }
 

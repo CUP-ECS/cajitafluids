@@ -269,7 +269,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 
 		int gi, gj;
                 l2g(i, j, gi, gj); 
-		bc.apply_pressure(gi, gj, i, j, u, v, scale);
+		bc(Cell(), u, v, gi, gj, i, j);
             });
     }
 
