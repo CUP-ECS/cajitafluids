@@ -70,7 +70,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 	    const InflowSource<2> &source,
             const BodyForce<2> &body,
             const double delta_t )
-        : _halo_min( 2 ), _density(density), _bc(bc), 
+        : _halo_min( 3 ), _density(density), _bc(bc), 
 	  _source(source), _body(body), _dt( delta_t)
     {
 
