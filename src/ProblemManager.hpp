@@ -126,11 +126,6 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         auto cell_scalar_layout =
             Cajita::createArrayLayout( _mesh->localGrid(), 1, Cajita::Cell() );
 
-	// Our halo for velocities and cell population information is
-	// 2 deep - semi-lagrangian advection moves data between cells
-        // no farther than 2 steps, and our timestep should be much smaller than
-        // this.
-
 	// The actual arrays storing mesh quantities
         // 1. The quantity of the scalar quantity being advected
         _quantity_curr = Cajita::createArray<double, MemorySpace>("quantity",
@@ -152,10 +147,11 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 	// could reach two additional cells in outside our boundary. As a result, we need 
 	// halos that are 3 cells deep. It's unlikely that we need this deep at corner, but
 	// we halo that far anyway, just to be sure.
+        int halo_depth = _mesh->localGrid()->haloCellWidth();
         auto advection_halo_pattern = Cajita::HaloPattern<2>();
         std::vector<std::array<int, 2>> neighbors;
-        for ( int i = -3; i <= 3; i++ ) {
-            for ( int j = -3; j <= 3; j++ ) {
+        for ( int i = -halo_depth; i <= halo_depth; i++ ) {
+            for ( int j = -halo_depth; j <= halo_depth; j++ ) {
                 if (  !( i == 0 && j == 0 ) ) {
                     neighbors.push_back( { i, j } );
                 }
