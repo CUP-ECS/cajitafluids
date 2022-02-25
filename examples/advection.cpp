@@ -12,6 +12,8 @@
 #define DEBUG 0
 #endif
 
+//#define HYPRE
+
 // Include Statements
 #include <BoundaryConditions.hpp>
 #include <Solver.hpp>
@@ -39,7 +41,32 @@ using namespace CajitaFluids;
 // x - On-node Parallelism ( Serial/Threaded/OpenMP/CUDA ), 
 // t - Time Steps, w - Write Frequency
 // d - Input Density, i - Input Location, v - Inflow Velocity
-static char *shortargs = ( char * )"n:s:x:t:w:d:i:v:g:";
+static char *shortargs = ( char * )"n:s:t:i:d:g:p:m:c:x:y:w:h:q:u:v:";
+
+static option longargs[] = {
+        // Basic simulation parameters
+        {"cells", required_argument, NULL, 'n'}, 
+        {"size", required_argument, NULL, 's'}, 
+        {"time", required_argument, NULL, 't'},
+        {"deltat", required_argument, NULL, 'i'},
+        {"density", required_argument, NULL, 'd'}, 
+        {"gravity", required_argument, NULL, 'g'}, 
+        {"driver", required_argument, NULL, 'p'},
+
+        {"matrix-solver", required_argument, NULL, 'm'},
+        {"preconditioner", required_argument, NULL, 'c'},
+        
+        // Inflow  simulation parameters
+        {"input-x", required_argument, NULL, 'x'}, 
+        {"input-y", required_argument, NULL, 'y'}, 
+        {"input-width", required_argument, NULL, 'w'},
+        {"input-height", required_argument, NULL, 'h'},
+        {"input-quantity", required_argument, NULL, 'q'}, 
+        {"input-velocity-x", required_argument, NULL, 'u'},
+        {"input-velocity-y", required_argument, NULL, 'v'},
+
+        {"help", no_argument, NULL, 'j'},
+        {0}};
 
 /**
  * @struct ClArgs
@@ -50,14 +77,19 @@ struct ClArgs {
     std::string device;     /**< ( Serial, Threads, OpenMP, CUDA ) */
     std::array<int, 2>      global_num_cells;  /**< Number of cells */
     Kokkos::Array<double, 4> global_bounding_box; /**< Bounding box of domain */
-    std::array<double, 2> inLocation;/**< Inflow Location */
-    std::array<double, 2> inSize;    /**< Inflow Size */
-    std::array<double, 2> inVelocity;/**< Inflow Velocity */
-    double       inQuantity;/**< Inflow Rate */
+
     double       density;   /**< Density of the fluid */
     double 	 gravity;   /**< Gravity */
     double       delta_t;   /**< Timestep */
     double       t_final;   /**< Ending time */
+
+    std::string  solver;    /**< Matrix solver name */
+    std::string  precon;    /**< Matrix preconditioner name */
+
+    std::array<double, 2> inLocation;/**< Inflow Location */
+    std::array<double, 2> inSize;    /**< Inflow Size */
+    std::array<double, 2> inVelocity;/**< Inflow Velocity */
+    double       inQuantity;/**< Inflow Rate */
 };
 
 /**
@@ -68,42 +100,48 @@ struct ClArgs {
 void help( const int rank, char *progname ) {
     if ( rank == 0 ) {
         std::cout << "Usage: " << progname << "\n";
-        std::cout << std::left << std::setw( 10 ) << "-x" 
+        std::cout << std::left << std::setw( 10 ) << "-p" 
 		  << std::setw( 40 ) << "On-node Parallelism Model (default serial)" 
 		  << std::left << "\n";
         std::cout << std::left << std::setw( 10 ) << "-s"
-		  << std::setw( 40 ) << "Size of domain (default 1.0 1.0)" 
+		  << std::setw( 40 ) << "Size of domain (default 1.0)" 
 		  << std::left << "\n";
         std::cout << std::left << std::setw( 10 ) << "-n" 
-		  << std::setw( 40 ) << "Number of Cells (default 128 128)" 
+		  << std::setw( 40 ) << "Number of Cells (default 128)" 
 		  << std::left << "\n";
         std::cout << std::left << std::setw( 10 ) << "-t" 
 		  << std::setw( 40 ) << "Amount of time to simulate (default 4.0)" 
 		  << std::left << "\n";
+        std::cout << std::left << std::setw( 10 ) << "-t" 
+		  << std::setw( 40 ) << "Timestep increment (default 0.005)" 
+		  << std::left << "\n";
         std::cout << std::left << std::setw( 10 ) << "-w" << std::setw( 40 ) 
 		  << "Write Frequency (default 20)" << std::left << "\n";
-        std::cout << std::left << std::setw( 10 ) << "-i" << std::setw( 40 ) 
-		  << "Inflow Location (default 25, 5)" << std::left << "\n";
+        std::cout << std::left << std::setw( 10 ) << "-d" << std::setw( 40 ) 
+		  << "Fluid Density (default 0.1)" << std::left << "\n";
+
+        // Inflow Source Arguments
+        std::cout << std::left << std::setw( 10 ) << "-x" << std::setw( 40 ) 
+		  << "Inflow X Location (default 0.2)" << std::left << "\n";
+        std::cout << std::left << std::setw( 10 ) << "-y" << std::setw( 40 ) 
+		  << "Inflow Y Location (default 0.45)" << std::left << "\n";
+        std::cout << std::left << std::setw( 10 ) << "-w" << std::setw( 40 ) 
+		  << "Inflow Width (default 0.001)" << std::left << "\n";
+        std::cout << std::left << std::setw( 10 ) << "-h" << std::setw( 40 ) 
+		  << "Inflow Height (default 0.1)" << std::left << "\n";
+        std::cout << std::left << std::setw( 10 ) << "-u" << std::setw( 40 ) 
+		  << "Inflow X Velocity (default 0)" << std::left << "\n";
         std::cout << std::left << std::setw( 10 ) << "-v" << std::setw( 40 ) 
-		  << "Inflow Velocity (default 0, 10)" << std::left << "\n";
-        std::cout << std::left << std::setw( 10 ) << "-d" << std::setw( 40 ) 
-		  << "Inflow Density (default 5)" << std::left << "\n";
-        std::cout << std::left << std::setw( 10 ) << "-d" << std::setw( 40 ) 
-		  << "Inflow Density (default 5)" << std::left << "\n";
+		  << "Inflow Y Velocity (default 1.0)" << std::left << "\n";
+        std::cout << std::left << std::setw( 10 ) << "-q" << std::setw( 40 ) 
+		  << "Inflow Quantity (default 3.0)" << std::left << "\n";
+
+        // Body Force Arguments
+        std::cout << std::left << std::setw( 10 ) << "-g" << std::setw( 40 ) 
+		  << "Gravity (default 0.0)" << std::left << "\n";
+
         std::cout << std::left << std::setw( 10 ) << "-h" 
 		  << std::setw( 40 ) << "Print Help Message" << std::left << "\n";
-    }
-}
-
-/**
- * Outputs usage hint if invalid command line arguments are given.
- * @param rank The rank calling the function
- * @param progname The name of the program
- */
-void usage( const int rank, char *progname ) {
-    if ( rank == 0 )  {
-        std::cout << "usage: " << progname << " [-s size-of-domain] [-h help]"
-                                   << " [-m threading] [-n number-of-cells] [-p periodicity] [-s sigma] [-t number-time-steps] [-w write-frequency]\n";
     }
 }
 
@@ -117,20 +155,149 @@ void usage( const int rank, char *progname ) {
  * @return Error status
  */
 int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
+
+    /// Set default values
     cl.device = "serial";              // Default Thread Setting
     cl.t_final = 4.0;   
     cl.delta_t = 0.005;  
     cl.write_freq = 20;  
     cl.global_num_cells    = { 128, 128 };
     cl.global_bounding_box = { 0, 0, 1.0, 1.0 };
-    cl.inLocation =  	     {0.45, 0.2};
-    cl.inSize =  	     {0.1, 0.01};
+    cl.inLocation =  	     {0.2, 0.45};
+    cl.inSize =  	     {0.02, 0.1};
     cl.inVelocity =          { 1.0, 0.0 };
     cl.inQuantity = 	     3.0;
     cl.density = 0.1;
     cl.gravity = 0.0;
 
-    // Set Cell Count and Bounding Box Arrays
+    cl.solver = "PCG";
+    cl.precon = "Jacobi";
+
+    int ch;
+    // Now parse any arguments
+    while ((ch = getopt_long(argc, argv, shortargs, longargs, NULL)) != -1) {
+        switch (ch) {
+        case 'n':
+            cl.global_num_cells[0] = atoi(optarg);
+            if (cl.global_num_cells[0] <= 0) {
+                std::cerr << "Invalid cell number argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            cl.global_num_cells[1] = cl.global_num_cells[0];
+            break;
+        case 's':
+            cl.global_bounding_box[2] = atof(optarg);
+       
+            if (cl.global_bounding_box[3] <= 0.0) {
+                std::cerr << "Invalid bounding box size argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            cl.global_bounding_box[0] = 0.0;
+            cl.global_bounding_box[1] = 0.0;
+            cl.global_bounding_box[3] = cl.global_bounding_box[2];
+            break;
+        case 't':
+            cl.t_final = atof(optarg);
+            if (cl.t_final <= 0.0) {
+                std::cerr << "Invalid final time argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'i':
+            cl.delta_t = atof(optarg);
+            if (cl.t_final <= 0.0) {
+                std::cerr << "Invalid timestep increment argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'd':
+            cl.density = atof(optarg);
+            if (cl.density <= 0.0) {
+                std::cerr << "Invalid fluid density argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'p':
+            cl.device = strdup(optarg);
+            if ((cl.device.compare("serial") != 0) 
+                && (cl.device.compare("cuda") != 0) 
+                && (cl.device.compare("openmp") != 0) 
+                && (cl.device.compare("pthreads") != 0) ) {
+                std::cerr << "Invalid  parallel device argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'g':
+            cl.gravity = atof(optarg);
+            break;
+        case 'j':
+            help(rank, argv[0]);
+            exit(0);
+            break;
+        case 'm':
+	    cl.solver = optarg;
+            break;
+        case 'c':
+	    cl.precon = optarg;
+            break;
+        case 'x':
+            cl.inLocation[0] = atof(optarg);
+            if (cl.inLocation[0] < 0.0) {
+                std::cerr << "Invalid inflow x argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'y':
+            cl.inLocation[1] = atof(optarg);
+            if (cl.inLocation[1] < 0.0) {
+                std::cerr << "Invalid inflow y argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'w':
+            cl.inSize[0] = atof(optarg);
+            if (cl.inSize[0] <= 0.0) {
+                std::cerr << "Invalid inflow width argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'h':
+            cl.inSize[1] = atof(optarg);
+            if (cl.inSize[1] <= 0.0) {
+                std::cerr << "Invalid inflow height argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'q':
+            cl.inQuantity = atof(optarg);
+            if (cl.inQuantity < 0.0) {
+                std::cerr << "Invalid inflow quantity argument.\n";
+                help(rank, argv[0]);
+                exit(-1);
+            }
+            break;
+        case 'u':
+            cl.inVelocity[0] = atof(optarg);
+            break;
+        case 'v':
+            cl.inVelocity[1] = atof(optarg);
+            break;
+        default:
+            std::cerr << "Invalid argument.\n";
+            help(rank, argv[0]);
+            break;
+        }
+    }
 
     // Return Successfully
     return 0;
@@ -188,16 +355,7 @@ void advect( ClArgs &cl ) {
     MPI_Comm_size( MPI_COMM_WORLD, &comm_size ); // Number of Ranks
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );      // Get My Rank
 
-    int x_ranks = comm_size;
-    while ( x_ranks % 2 == 0 && x_ranks > 2 ) {
-        x_ranks /= 2;
-    }
-    int y_ranks = comm_size / x_ranks;
-    if ( DEBUG ) std::cout << "X Ranks: " << x_ranks << " Y Ranks: " << y_ranks << "\n";
-
-    std::array<int, 2> ranks_per_dim = { x_ranks, y_ranks }; // Ranks per Dimension
-
-    Cajita::ManualBlockPartitioner<2> partitioner( ranks_per_dim ); // Create Cajita Partitioner
+    Cajita::DimBlockPartitioner<2> partitioner; // Create Cajita Partitioner
     CajitaFluids::BoundaryCondition<2> bc;
     bc.boundary_type = {CajitaFluids::BoundaryType::SOLID,
                         CajitaFluids::BoundaryType::SOLID,
@@ -211,7 +369,7 @@ void advect( ClArgs &cl ) {
     MeshInitFunc<2> initializer( 0.0, {0.0, 0.0});
     auto solver = CajitaFluids::createSolver( cl.device, MPI_COMM_WORLD, 
         cl.global_bounding_box, cl.global_num_cells, partitioner,
-        cl.density, initializer, bc, source, body, cl.delta_t) ;
+        cl.density, initializer, bc, source, body, cl.delta_t, cl.solver, cl.precon) ;
     // Solve
     solver->solve( cl.t_final, cl.write_freq );
 }
@@ -232,7 +390,7 @@ int main( int argc, char *argv[] ) {
     // Only Rank 0 Prints Command Line Options
     if ( rank == 0 ) {
         // Print Command Line Options
-        std::cout << "ExaClamr\n";
+        std::cout << "CajitaFluids\n";
         std::cout << "=======Command line arguments=======\n";
         std::cout << std::left << std::setw( 20 ) << "Thread Setting" << ": " 
 		  << std::setw( 8 ) << cl.device << "\n"; // Threading Setting

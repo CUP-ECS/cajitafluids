@@ -2,9 +2,13 @@ set(HEADERS
   BodySource.hpp
   BoundaryConditions.hpp
   InflowSource.hpp
+  Interpolation.hpp
   Mesh.hpp
   ProblemManager.hpp
+  SiloWriter.hpp
   Solver.hpp
+  TimeIntegrator.hpp
+  VelocityCorrector.hpp
   )
 
 set(SOURCES
@@ -13,10 +17,15 @@ set(SOURCES
 
 add_library(cajitafluids ${SOURCES})
 
+# We use C++ 17 features (if constexpr)
+target_compile_features(cajitafluids PUBLIC cxx_std_17)
+
 target_link_libraries(cajitafluids
   Cabana::cabanacore
   Cabana::Cajita
   Silo::silo )
+
+# Add HYPRE:HYPRE to the above if needed for a cabana-local build
 
 target_include_directories(cajitafluids
   PUBLIC

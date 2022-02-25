@@ -77,21 +77,6 @@ class Mesh
             _max_domain_global_cell_index[d] = num_cell[d] - 1;
         }
 
-#if 0
-        // For dimensions that are not periodic we pad by the minimum halo
-        // cell width to allow for projections outside of the domain.
-        // PGB - We don't do this!
-        for ( int d = 0; d < Dim; ++d )
-        {
-                global_low_corner[d] -= cell_size * minimum_halo_cell_width;
-                global_high_corner[d] += cell_size * minimum_halo_cell_width;
-                num_cell[d] += 2 * minimum_halo_cell_width;
-                _min_domain_global_cell_index[d] += minimum_halo_cell_width;
-                _max_domain_global_cell_index[d] -= minimum_halo_cell_width;
-            }
-        }
-#endif
-
         // Create the global mesh.
         auto global_mesh = Cajita::createUniformGlobalMesh(
             global_low_corner, global_high_corner, num_cell );
@@ -99,6 +84,7 @@ class Mesh
         // Build the global grid.
         std::array<bool, Dim> periodic;
         for (int i = 0; i < Dim; i++) periodic[i] = false;
+
         auto global_grid = Cajita::createGlobalGrid( comm, global_mesh,
                                                      periodic, partitioner );
 
