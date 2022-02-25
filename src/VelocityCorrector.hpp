@@ -93,7 +93,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
     // that this is a much simpler and shallow halo poattern than the ones
     // used for advection.
     _pressure_halo = Cajita::createHalo<double, MemorySpace>(
-                                 *vector_layout, Cajita::FaceHaloPattern<2>() );
+                         *vector_layout, Cajita::FaceHaloPattern<2>(), 1);
   }
 
   template <class View_t> 

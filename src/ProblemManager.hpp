@@ -148,23 +148,14 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 	// halos that are 3 cells deep. It's unlikely that we need this deep at corner, but
 	// we halo that far anyway, just to be sure.
         int halo_depth = _mesh->localGrid()->haloCellWidth();
-        auto advection_halo_pattern = Cajita::HaloPattern<2>();
-        std::vector<std::array<int, 2>> neighbors;
-        for ( int i = -halo_depth; i <= halo_depth; i++ ) {
-            for ( int j = -halo_depth; j <= halo_depth; j++ ) {
-                if (  !( i == 0 && j == 0 ) ) {
-                    neighbors.push_back( { i, j } );
-                }
-            }
-        }
-        advection_halo_pattern.setNeighbors( neighbors );
+        auto advection_halo_pattern = Cajita::NodeHaloPattern<2>();
 
         _iface_advection_halo = Cajita::createHalo<double, MemorySpace>(
-            *iface_scalar_layout, advection_halo_pattern );
+            *iface_scalar_layout, advection_halo_pattern, halo_depth );
         _jface_advection_halo = Cajita::createHalo<double, MemorySpace>(
-            *jface_scalar_layout, advection_halo_pattern );
+            *jface_scalar_layout, advection_halo_pattern, halo_depth );
         _cell_advection_halo = Cajita::createHalo<double, MemorySpace>(
-            *cell_scalar_layout, advection_halo_pattern );
+            *cell_scalar_layout, advection_halo_pattern, halo_depth );
 
         // Initialize State Values ( quantity and velocity )
         initialize( create_functor );
