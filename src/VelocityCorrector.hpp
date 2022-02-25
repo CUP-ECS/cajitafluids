@@ -222,7 +222,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
         auto rhs = _rhs->view();
 
 	// Get the ghosts we'll need for interpolation XXX do we need this?
-        _pm->gather( );
+        _pm->gather( Version::Current() );
 
         Kokkos::parallel_for(
             "divergence", createExecutionPolicy( cell_space, ExecutionSpace() ),

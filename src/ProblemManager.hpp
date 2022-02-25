@@ -132,12 +132,19 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
                                                                   cell_scalar_layout);
         _quantity_next = Cajita::createArray<double, MemorySpace>("quantity",
                                                                   cell_scalar_layout);
-	
+	Cajita::ArrayOp::assign(*_quantity_curr, 0.0, Cajita::Ghost());
+	Cajita::ArrayOp::assign(*_quantity_next, 0.0, Cajita::Ghost());
+
 	// 2. The magnitudes of the velocities normal to the cell faces
-        _ui_curr = Cajita::createArray<double, MemorySpace>( "u0", iface_scalar_layout);
-        _ui_next = Cajita::createArray<double, MemorySpace>( "u1", iface_scalar_layout);
-        _uj_curr = Cajita::createArray<double, MemorySpace>( "v0", jface_scalar_layout);
-        _uj_next = Cajita::createArray<double, MemorySpace>( "v1", jface_scalar_layout);
+        _u_curr = Cajita::createArray<double, MemorySpace>( "u0", iface_scalar_layout);
+        _u_next = Cajita::createArray<double, MemorySpace>( "u1", iface_scalar_layout);
+	Cajita::ArrayOp::assign(*_u_curr, 0.0, Cajita::Ghost());
+	Cajita::ArrayOp::assign(*_u_next, 0.0, Cajita::Ghost());
+
+        _v_curr = Cajita::createArray<double, MemorySpace>( "v0", jface_scalar_layout);
+        _v_next = Cajita::createArray<double, MemorySpace>( "v1", jface_scalar_layout);
+	Cajita::ArrayOp::assign(*_v_curr, 0.0, Cajita::Ghost());
+	Cajita::ArrayOp::assign(*_v_next, 0.0, Cajita::Ghost());
 
         // Halo patterns for the velocity and quantity advection. These halos are 
 	// are three cells deep because:
@@ -147,7 +154,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 	// could reach two additional cells outside our boundary.
         int halo_depth = _mesh->localGrid()->haloCellWidth();
         _advection_halo = Cajita::createHalo( Cajita::NodeHaloPattern<2>(), halo_depth, 
-            *_quantity_curr, *_ui_curr, *_uj_curr );
+            *_quantity_curr, *_u_curr, *_v_curr );
 
         // Initialize State Values ( quantity and velocity )
         initialize( create_functor );
@@ -191,7 +198,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         // Loop Over All Owned I-Faces ( i, j )
         auto own_faces = local_grid.indexSpace( 
             Cajita::Own(), Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
-        auto ui = get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), Version::Current() );
+        auto u = get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), Version::Current() );
 	local_mesh.coordinates( Cajita::Face<Cajita::Dim::I>(), index, loc ); 
         Kokkos::parallel_for(
             "Initialize I-Faces", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), 
@@ -204,13 +211,13 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 
                 // Initialization Function
                 create_functor( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), 
-			        coords, x, ui(i, j, 0));
+			        coords, x, u(i, j, 0));
             } );
 
         // Loop Over All Owned J-Faces ( i, j )
         own_faces = local_grid.indexSpace( 
             Cajita::Own(), Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
-        auto uj = get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), Version::Current() );
+        auto v = get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), Version::Current() );
 	local_mesh.coordinates( Cajita::Face<Cajita::Dim::J>(), index, loc ); 
         Kokkos::parallel_for(
             "Initialize J-Faces", Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ), 
@@ -224,7 +231,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 
                 // Initialization Function
                 create_functor( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), 
-			        coords, x, uj(i, j, 0) );
+			        coords, x, v(i, j, 0) );
             } );
     };
 
@@ -266,7 +273,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @return Returns view of current norm velocity magnitude on i faces
      **/
     typename cell_array::view_type get( Cajita::Face<Cajita::Dim::I>, Field::Velocity, Version::Current ) const {
-        return _ui_curr->view();
+        return _u_curr->view();
     };
 
     /**
@@ -277,7 +284,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @return Returns view of next norm velocity magnitude on i faces
      **/
     typename cell_array::view_type get( Cajita::Face<Cajita::Dim::I>, Field::Velocity, Version::Next ) const {
-        return _ui_next->view();
+        return _u_next->view();
     };
 
     /**
@@ -288,7 +295,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @return Returns view of current norm velocity magnitude on j faces
      **/
     typename cell_array::view_type get( Cajita::Face<Cajita::Dim::J>, Field::Velocity, Version::Current ) const {
-        return _uj_curr->view();
+        return _v_curr->view();
     };
 
     /**
@@ -299,7 +306,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @return Returns view of next norm velocity magnitude on j faces
      **/
     typename cell_array::view_type get( Cajita::Face<Cajita::Dim::J>, Field::Velocity, Version::Next ) const {
-        return _uj_next->view();
+        return _v_next->view();
     };
 
     /**
@@ -317,7 +324,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Field::Velocity
      **/
     void advance( Cajita::Face<Cajita::Dim::I>, Field::Velocity) {
-	_ui_curr.swap(_ui_next);
+	_u_curr.swap(_u_next);
     }
 
     /**
@@ -326,7 +333,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Field::Velocity
      **/
     void advance( Cajita::Face<Cajita::Dim::J>, Field::Velocity) {
-	_uj_curr.swap(_uj_next);
+	_v_curr.swap(_v_next);
     }
 
     /**
@@ -336,11 +343,13 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 
     /**
      * Gather State Data from Neighbors
-     * @param Locationl
-     * @param Field
+     * @param Version
      **/
-    void gather( ) const {
-        _advection_halo->gather( ExecutionSpace(), *_quantity_curr, *_ui_curr, *_uj_curr );
+    void gather( Version::Current ) const {
+        _advection_halo->gather( ExecutionSpace(), *_quantity_curr, *_u_curr, *_v_curr );
+    };
+    void gather( Version::Next ) const {
+        _advection_halo->gather( ExecutionSpace(), *_quantity_next, *_u_next, *_v_next );
     };
 
   private:
@@ -349,8 +358,8 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 
     // Basic long-term quantities stored and advected in the mesh
     std::shared_ptr<cell_array> _quantity_curr, _quantity_next;
-    std::shared_ptr<iface_array> _ui_curr, _ui_next;
-    std::shared_ptr<jface_array> _uj_curr, _uj_next;
+    std::shared_ptr<iface_array> _u_curr, _u_next;
+    std::shared_ptr<jface_array> _v_curr, _v_next;
 
     // Halo communication pattern for the advected quantities
     std::shared_ptr<halo_type> _advection_halo;
