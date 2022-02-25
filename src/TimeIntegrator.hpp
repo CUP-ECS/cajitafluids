@@ -42,7 +42,7 @@ void rk3(const double x0[NumSpaceDims],
     double v0[NumSpaceDims], 
            x1[NumSpaceDims], v1[NumSpaceDims],
 	   x2[NumSpaceDims], v2[NumSpaceDims]; 
-
+    
     // Velocity at current location.
     Interpolation::interpolateVelocity<NumSpaceDims, 1>(x0, local_mesh, u, v, v0);
 

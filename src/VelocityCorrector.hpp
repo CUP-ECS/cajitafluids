@@ -73,6 +73,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 						    vector_layout);
     _rhs = Cajita::createArray<double, MemorySpace>("pressure RHS",
 						    vector_layout);
+    Cajita::ArrayOp::assign(*_lhs, 0.0, Cajita::Ghost());
+    Cajita::ArrayOp::assign(*_rhs, 0.0, Cajita::Ghost());
 
     // Set up the solver to compute the pressure at each point using a 5-point 
     // 2d laplacian stencil. The matrix itself will have 0 weights for elements
