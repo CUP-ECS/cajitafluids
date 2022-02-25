@@ -41,7 +41,7 @@ using namespace CajitaFluids;
 // x - On-node Parallelism ( Serial/Threaded/OpenMP/CUDA ), 
 // t - Time Steps, w - Write Frequency
 // d - Input Density, i - Input Location, v - Inflow Velocity
-static char *shortargs = ( char * )"n:s:t:i:d:g:p:x:y:w:h:q:u:v:";
+static char *shortargs = ( char * )"n:s:t:i:d:g:p:m:c:x:y:w:h:q:u:v:";
 
 static option longargs[] = {
         // Basic simulation parameters
@@ -51,8 +51,11 @@ static option longargs[] = {
         {"deltat", required_argument, NULL, 'i'},
         {"density", required_argument, NULL, 'd'}, 
         {"gravity", required_argument, NULL, 'g'}, 
-        {"parallelism", required_argument, NULL, 'p'},
+        {"driver", required_argument, NULL, 'p'},
 
+        {"matrix-solver", required_argument, NULL, 'm'},
+        {"preconditioner", required_argument, NULL, 'c'},
+        
         // Inflow  simulation parameters
         {"input-x", required_argument, NULL, 'x'}, 
         {"input-y", required_argument, NULL, 'y'}, 
@@ -74,14 +77,19 @@ struct ClArgs {
     std::string device;     /**< ( Serial, Threads, OpenMP, CUDA ) */
     std::array<int, 2>      global_num_cells;  /**< Number of cells */
     Kokkos::Array<double, 4> global_bounding_box; /**< Bounding box of domain */
-    std::array<double, 2> inLocation;/**< Inflow Location */
-    std::array<double, 2> inSize;    /**< Inflow Size */
-    std::array<double, 2> inVelocity;/**< Inflow Velocity */
-    double       inQuantity;/**< Inflow Rate */
+
     double       density;   /**< Density of the fluid */
     double 	 gravity;   /**< Gravity */
     double       delta_t;   /**< Timestep */
     double       t_final;   /**< Ending time */
+
+    std::string  solver;    /**< Matrix solver name */
+    std::string  precon;    /**< Matrix preconditioner name */
+
+    std::array<double, 2> inLocation;/**< Inflow Location */
+    std::array<double, 2> inSize;    /**< Inflow Size */
+    std::array<double, 2> inVelocity;/**< Inflow Velocity */
+    double       inQuantity;/**< Inflow Rate */
 };
 
 /**
@@ -162,6 +170,9 @@ int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
     cl.density = 0.1;
     cl.gravity = 0.0;
 
+    cl.solver = "PCG";
+    cl.precon = "Jacobi";
+
     int ch;
     // Now parse any arguments
     while ((ch = getopt_long(argc, argv, shortargs, longargs, NULL)) != -1) {
@@ -176,7 +187,7 @@ int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
             cl.global_num_cells[1] = cl.global_num_cells[0];
             break;
         case 's':
-            cl.global_bounding_box[3] = atof(optarg);
+            cl.global_bounding_box[2] = atof(optarg);
        
             if (cl.global_bounding_box[3] <= 0.0) {
                 std::cerr << "Invalid bounding box size argument.\n";
@@ -185,7 +196,7 @@ int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
             }
             cl.global_bounding_box[0] = 0.0;
             cl.global_bounding_box[1] = 0.0;
-            cl.global_bounding_box[4] = cl.global_bounding_box[3];
+            cl.global_bounding_box[3] = cl.global_bounding_box[2];
             break;
         case 't':
             cl.t_final = atof(optarg);
@@ -228,6 +239,12 @@ int parseInput( const int rank, const int argc, char **argv, ClArgs &cl ) {
         case 'j':
             help(rank, argv[0]);
             exit(0);
+            break;
+        case 'm':
+	    cl.solver = optarg;
+            break;
+        case 'c':
+	    cl.precon = optarg;
             break;
         case 'x':
             cl.inLocation[0] = atof(optarg);
@@ -352,7 +369,7 @@ void advect( ClArgs &cl ) {
     MeshInitFunc<2> initializer( 0.0, {0.0, 0.0});
     auto solver = CajitaFluids::createSolver( cl.device, MPI_COMM_WORLD, 
         cl.global_bounding_box, cl.global_num_cells, partitioner,
-        cl.density, initializer, bc, source, body, cl.delta_t) ;
+        cl.density, initializer, bc, source, body, cl.delta_t, cl.solver, cl.precon) ;
     // Solve
     solver->solve( cl.t_final, cl.write_freq );
 }

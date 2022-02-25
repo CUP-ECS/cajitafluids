@@ -69,7 +69,9 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             const BoundaryCondition<2>& bc,
 	    const InflowSource<2> &source,
             const BodyForce<2> &body,
-            const double delta_t )
+            const double delta_t,
+            const std::string &matrix_solver,
+            const std::string &preconditioner )
         : _halo_min( 3 ), _density(density), _bc(bc), 
 	  _source(source), _body(body), _dt( delta_t)
     {
@@ -102,7 +104,8 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             ExecutionSpace(), _mesh, create_functor );
 
 	// Create a velocity corrector to enforce incompressibility
-	_vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>( _pm, _bc, _density, _dt, "PFMG", "None");
+	_vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>( _pm, _bc, _density, _dt, 
+                  matrix_solver, preconditioner);
 
         // Set up Silo for I/O
         _silo = std::make_shared<SiloWriter<2, ExecutionSpace, MemorySpace>>( _pm );
@@ -240,7 +243,9 @@ createSolver( const std::string& device, MPI_Comm comm,
               const BoundaryCondition<2>& bc,
               const InflowSource<2>& source,
               const BodyForce<2>& body,
-              const double delta_t) 
+              const double delta_t,
+              const std::string &matrix_solver, 
+              const std::string &preconditioner) 
 {
     if ( 0 == device.compare( "serial" ) )
     {
@@ -250,7 +255,8 @@ createSolver( const std::string& device, MPI_Comm comm,
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::Serial, Kokkos::HostSpace>>(
             comm, global_bounding_box, global_num_cell, partitioner,
-            density, create_functor, bc, source, body, delta_t);
+            density, create_functor, bc, source, body, delta_t,
+            matrix_solver, preconditioner);
 #else
         throw std::runtime_error( "Serial Backend Not Enabled" );
 #endif
@@ -261,7 +267,8 @@ createSolver( const std::string& device, MPI_Comm comm,
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::OpenMP, Kokkos::HostSpace>>(
             comm, global_bounding_box, global_num_cell, partitioner,
-            density, create_functor, bc, source, body, delta_t );
+            density, create_functor, bc, source, body, delta_t,
+            matrix_solver, preconditioner );
 #else
         throw std::runtime_error( "OpenMP Backend Not Enabled" );
 #endif
@@ -272,7 +279,8 @@ createSolver( const std::string& device, MPI_Comm comm,
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::Cuda, Kokkos::CudaSpace>>(
             comm, global_bounding_box, global_num_cell, partitioner,
-            density, create_functor, bc, source, body, delta_t );
+            density, create_functor, bc, source, body, delta_t,
+            matrix_solver, preconditioner );
 #else
         throw std::runtime_error( "CUDA Backend Not Enabled" );
 #endif
@@ -283,7 +291,8 @@ createSolver( const std::string& device, MPI_Comm comm,
         return std::make_shared<CajitaFluids::Solver<2, Kokkos:Experimental::HIP, 
                                                      Kokkos::Experimental::HIPSpace>>(
             comm, global_bounding_box, global_num_cell, partitioner,
-            density, create_functor, bc, source, body, delta_t  );
+            density, create_functor, bc, source, body, delta_t,
+            matrix_solver, preconditioner  );
 #else
         throw std::runtime_error( "HIP Backend Not Enabled" );
 #endif
