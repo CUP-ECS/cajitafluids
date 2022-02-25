@@ -114,12 +114,7 @@ void step( const ExecutionSpace& exec_space, ProblemManagerType& pm,
     // Get up-to-date copies of the fields being advected and the velocity field
     // into the ghost cells so we can interpolate velocity correctly and retrieve
     // the value being advected into owned cells
-    pm.gather( Cell(), Field::Quantity() );
-    pm.gather( FaceI(), Field::Velocity() );
-    pm.gather( FaceJ(), Field::Velocity() );
-    if constexpr (NumSpaceDims == 3) {
-        pm.gather( FaceK(), Field::Velocity() );
-    }
+    pm.gather( );
 
     // Advect the fields we care about into the next versions of the fields
     advect<NumSpaceDims>(exec_space, pm, delta_t, bc, Cell(), Field::Quantity());

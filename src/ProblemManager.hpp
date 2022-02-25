@@ -140,22 +140,14 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         _uj_next = Cajita::createArray<double, MemorySpace>( "v1", jface_scalar_layout);
 
         // Halo patterns for the velocity and quantity advection. These halos are 
-	// used for advection calculations, and are three cells deep because:
+	// are three cells deep because:
 	// We only allow quantities to advect at most one cell in a single timestep,
 	// but that cell could be outside our owned space (1 halo cell) and 
 	// we interpolate the amount advected with a 3rd-order polynomial which 
-	// could reach two additional cells in outside our boundary. As a result, we need 
-	// halos that are 3 cells deep. It's unlikely that we need this deep at corner, but
-	// we halo that far anyway, just to be sure.
+	// could reach two additional cells outside our boundary.
         int halo_depth = _mesh->localGrid()->haloCellWidth();
-        auto advection_halo_pattern = Cajita::NodeHaloPattern<2>();
-
-        _iface_advection_halo = Cajita::createHalo<double, MemorySpace>(
-            *iface_scalar_layout, advection_halo_pattern, halo_depth );
-        _jface_advection_halo = Cajita::createHalo<double, MemorySpace>(
-            *jface_scalar_layout, advection_halo_pattern, halo_depth );
-        _cell_advection_halo = Cajita::createHalo<double, MemorySpace>(
-            *cell_scalar_layout, advection_halo_pattern, halo_depth );
+        _advection_halo = Cajita::createHalo( Cajita::NodeHaloPattern<2>(), halo_depth, 
+            *_quantity_curr, *_ui_curr, *_uj_curr );
 
         // Initialize State Values ( quantity and velocity )
         initialize( create_functor );
@@ -340,25 +332,16 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     /**
      * Standard three-deep halo patterns for advected mesh fields 
      */
-    std::shared_ptr<halo_type> advection_halo( Cell ) const { return _cell_advection_halo; }
-    std::shared_ptr<halo_type> advection_halo( FaceI ) const { return _iface_advection_halo; }
-    std::shared_ptr<halo_type> advection_halo( FaceJ ) const { return _jface_advection_halo; }
+    std::shared_ptr<halo_type> advection_halo( ) const { return _advection_halo; }
 
     /**
      * Gather State Data from Neighbors
      * @param Locationl
      * @param Field
      **/
-    void gather( Cajita::Cell, Field::Quantity ) const {
-        _cell_advection_halo->gather( ExecutionSpace(), *_quantity_curr );
+    void gather( ) const {
+        _advection_halo->gather( ExecutionSpace(), *_quantity_curr, *_ui_curr, *_uj_curr );
     };
-    void gather( Cajita::Face<Cajita::Dim::I>, Field::Velocity ) const {
-        _iface_advection_halo->gather( ExecutionSpace(), *_ui_curr);
-    };
-    void gather( Cajita::Face<Cajita::Dim::J>, Field::Velocity ) const {
-        _jface_advection_halo->gather( ExecutionSpace(), *_uj_curr);
-    };
-
 
   private:
     // The mesh on which our data items are stored
@@ -369,10 +352,8 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     std::shared_ptr<iface_array> _ui_curr, _ui_next;
     std::shared_ptr<jface_array> _uj_curr, _uj_next;
 
-    // Halo communicaiton patterns for the advected quantities
-    std::shared_ptr<halo_type> _iface_advection_halo;
-    std::shared_ptr<halo_type> _jface_advection_halo;
-    std::shared_ptr<halo_type> _cell_advection_halo;
+    // Halo communication pattern for the advected quantities
+    std::shared_ptr<halo_type> _advection_halo;
 
     //std::shared_ptr<halo_type> _cell_pressure_halo;
 };
