@@ -90,10 +90,10 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 
     // Finally, we need to halo pressure values with neighbors with whom
     // we share a face so that we can correct velocities on those faces. Note
-    // that this is a much simpler and shallow halo poattern than the ones
+    // that this is a much simpler and shallower halo poattern than the ones
     // used for advection.
     _pressure_halo = Cajita::createHalo<double, MemorySpace>(
-                                 *vector_layout, Cajita::FaceHaloPattern<2>() );
+                         *vector_layout, Cajita::FaceHaloPattern<2>(), 1);
   }
 
   template <class View_t> 
@@ -221,9 +221,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
                                                   Cajita::Local() );
         auto rhs = _rhs->view();
 
-	// Get the ghosts we'll need for interpolation
-        _pm->gather( FaceI(), Field::Velocity() );
-        _pm->gather( FaceJ(), Field::Velocity() );
+	// Get the ghosts we'll need for interpolation XXX do we need this?
+        _pm->gather( );
 
         Kokkos::parallel_for(
             "divergence", createExecutionPolicy( cell_space, ExecutionSpace() ),
