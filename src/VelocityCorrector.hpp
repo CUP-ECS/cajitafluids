@@ -247,7 +247,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 #endif
     }
 
-    void _apply_pressure()
+    void _applyPressure()
     {
         auto scale = _dt / (_density * _mesh->cellSize());
 
@@ -283,25 +283,37 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
             });
     }
 
-  void correctVelocity()
-  {
-    _buildRHS();
-    Cajita::ArrayOp::assign( *_lhs, 0.0, Cajita::Own());
-    _pressure_solver->solve( *_rhs, *_lhs );
-    _apply_pressure();
+    void correctVelocity()
+    {
+        Kokkos::Profiling::pushRegion("VelocityCorrector");
 
-  }
-    private:
-  std::shared_ptr<cell_array> _lhs;
-  std::shared_ptr<cell_array> _rhs;
-  BoundaryCondition<2> _bc;
-  std::shared_ptr<pm_type> _pm;
-  std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
-  std::shared_ptr<SparseSolver> _pressure_solver;
-  std::shared_ptr<Cajita::Halo<MemorySpace>> _pressure_halo;
+        Kokkos::Profiling::pushRegion("VelocityCorrector::BuildProblem");
+        _buildRHS();
+        Cajita::ArrayOp::assign( *_lhs, 0.0, Cajita::Own());
+        Kokkos::Profiling::popRegion();
+
+        Kokkos::Profiling::pushRegion("VelocityCorrector::PresureSolve");
+        _pressure_solver->solve( *_rhs, *_lhs );
+        Kokkos::Profiling::popRegion();
+
+        Kokkos::Profiling::pushRegion("VelocityCorrector::ApplyPressure");
+        _applyPressure();
+        Kokkos::Profiling::popRegion();
+
+        Kokkos::Profiling::popRegion();
+
+    }
+  private:
+    std::shared_ptr<cell_array> _lhs;
+    std::shared_ptr<cell_array> _rhs;
+    BoundaryCondition<2> _bc;
+    std::shared_ptr<pm_type> _pm;
+    std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
+    std::shared_ptr<SparseSolver> _pressure_solver;
+    std::shared_ptr<Cajita::Halo<MemorySpace>> _pressure_halo;
   
-  double _dt;
-  double _density;
+    double _dt;
+    double _density;
 };
 
 template <std::size_t NumSpaceDims, class ExecutionSpace, class MemorySpace,

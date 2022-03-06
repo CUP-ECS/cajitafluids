@@ -81,12 +81,11 @@ void advect(ExecutionSpace &exec_space, ProblemManagerType &pm, double delta_t,
 
     auto u = pm.get(FaceI(), Field::Velocity(), Version::Current());
     auto v = pm.get(FaceJ(), Field::Velocity(), Version::Current());
+//    auto w = pm.get(FaceK(), Field::Velocity(), Version::Current());
 
     auto local_grid = pm.mesh()->localGrid();
     auto local_mesh = *(pm.mesh()->localMesh());
 
-    // XX Only handling 2D for now
-//    auto w = pm.get(FaceK(), Field::Velocity(), Version::Current());
     auto owned_items = local_grid->indexSpace( Cajita::Own(), entity, 
                                                Cajita::Local() );
     parallel_for("advection loop", 
@@ -111,20 +110,38 @@ template <std::size_t NumSpaceDims, class ProblemManagerType, class ExecutionSpa
 void step( const ExecutionSpace& exec_space, ProblemManagerType& pm,
            const double delta_t, const BoundaryCondition<NumSpaceDims>& bc )
 {
+    Kokkos::Profiling::pushRegion("TimeIntegrator::Step");
+
     // Get up-to-date copies of the fields being advected and the velocity field
     // into the ghost cells so we can interpolate velocity correctly and retrieve
     // the value being advected into owned cells
+    Kokkos::Profiling::pushRegion("TimeIntegrator::Step::Gather");
     pm.gather( Version::Current() );
+    Kokkos::Profiling::popRegion();
 
+    Kokkos::Profiling::pushRegion("TimeIntegrator::Step::Advect");
     // Advect the fields we care about into the next versions of the fields
+    Kokkos::Profiling::pushRegion("TimeIntegrator::Step::Advect::Quantity");
     advect<NumSpaceDims>(exec_space, pm, delta_t, bc, Cell(), Field::Quantity());
-    advect<NumSpaceDims>(exec_space, pm, delta_t, bc, FaceI(), Field::Velocity());
-    advect<NumSpaceDims>(exec_space, pm, delta_t, bc, FaceJ(), Field::Velocity());
-    if constexpr (NumSpaceDims == 3) {
-        advect<NumSpaceDims>(exec_space, pm, delta_t, FaceJ(), Field::Velocity());
-    }
+    Kokkos::Profiling::popRegion();
 
-    // Once all calculatins with the current versions of the fields (including
+    Kokkos::Profiling::pushRegion("TimeIntegrator::Step::Advect::Velocity::FaceI");
+    advect<NumSpaceDims>(exec_space, pm, delta_t, bc, FaceI(), Field::Velocity());
+    Kokkos::Profiling::popRegion();
+
+    Kokkos::Profiling::pushRegion("TimeIntegrator::Step::Advect::Velocity::FaceJ");
+    advect<NumSpaceDims>(exec_space, pm, delta_t, bc, FaceJ(), Field::Velocity());
+    Kokkos::Profiling::popRegion();
+
+    if constexpr (NumSpaceDims == 3) {
+        Kokkos::Profiling::pushRegion("TimeIntegrator::Step::Advect::Velocity::FaceK");
+        advect<NumSpaceDims>(exec_space, pm, delta_t, FaceK(), Field::Velocity());
+        Kokkos::Profiling::popRegion();
+    }
+    Kokkos::Profiling::popRegion();
+
+    Kokkos::Profiling::pushRegion("CajitaFluids::TimeIntegrator::Advance");
+    // Once all calculations with the current versions of the fields (including
     // Velocity!) are done, swap the old values with the new one to finish the 
     // time step.
     pm.advance(Cell(), Field::Quantity());
@@ -132,7 +149,10 @@ void step( const ExecutionSpace& exec_space, ProblemManagerType& pm,
     pm.advance(FaceJ(), Field::Velocity());
     if constexpr (NumSpaceDims == 3) {
         pm.advance(FaceK(), Field::Velocity());
+    Kokkos::Profiling::popRegion();
     }
+
+    Kokkos::Profiling::popRegion();
 }
 
 //---------------------------------------------------------------------------//
