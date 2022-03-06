@@ -119,7 +119,6 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
 	Kokkos::Profiling::pushRegion("Solve");
 
-	Kokkos::Profiling::pushRegion("Solve::WriteState");
 	_silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
 	Kokkos::Profiling::popRegion();
 
@@ -131,7 +130,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 		printf( "Step %d / %d at time = %f\n", t, num_step, time );
 	    
 	    // 1. Handle inflow and body forces.
-	    addInputs();
+	    _addInputs();
 
 	    // 2. Adjust the velocity field to be divergence-free 
             _vc->correctVelocity();
@@ -142,9 +141,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
 	    // 4. Output mesh state periodically
 	    if ( 0 == t % write_freq ) {
-	        Kokkos::Profiling::pushRegion("Solve::WriteState");
 		_silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
-                Kokkos::Profiling::popRegion();
 	    }
 	    time += _dt;
 	    t++;
@@ -154,7 +151,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
 
     /* Internal methods for the solver */
-    void addInputs()
+    void _addInputs()
     {
         auto local_grid = *( _mesh->localGrid() );
         auto local_mesh = *( _mesh->localMesh() );

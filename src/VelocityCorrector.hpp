@@ -207,48 +207,36 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 
     void _buildRHS() 
     {
-        // Zero the RHS
+        Kokkos::Profiling::pushRegion("VelocityCorrector::BuildProblem:buildRHS");
+
+        Kokkos::Profiling::pushRegion("VelocityCorrector::BuildProblem:buildRHS:Gather");
+	// Get the ghosts we need for divergence interpolation
+        _pm->gather( Version::Current() );
+	Kokkos::Profiling::popRegion();
+
 	Cajita::ArrayOp::assign( *_rhs, 0.0, Cajita::Own());
         auto scale = 1.0 / _mesh->cellSize();
 
         auto u  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
         auto v  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
 
-        // For now we manually compute the divergence from the staggered
-	// mesh for simplicity. Later we will want to use a G2G interface
-        // in Cajita similar to its G2P interface, but that's not been 
-        // developed yet. 
         auto local_grid = _mesh->localGrid();
         auto cell_space = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(),
                                                   Cajita::Local() );
         auto rhs = _rhs->view();
 
-	// Get the ghosts we'll need for interpolation XXX do we need this?
-        _pm->gather( Version::Current() );
-
         Kokkos::parallel_for(
-            "divergence", createExecutionPolicy( cell_space, ExecutionSpace() ),
+            "ComputeDivergence", createExecutionPolicy( cell_space, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
 	        rhs(i, j, 0) = -scale * (u(i+1, j, 0) - u(i, j, 0) 
 					  + v(i, j+1, 0) - v(i, j, 0));
             });
-#if DEBUG
-	auto rhs_host = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), rhs);
-        std::cout << "RHS:\n";
-        auto owned_space = _mesh->localGrid()->indexSpace( Cajita::Own(), Cell(), Cajita::Local() );
-        for (int i = owned_space.min(0); i < owned_space.max(0); i++) {
-            for (int j = owned_space.min(1); j < owned_space.max(1); j++) {
-		std::cout << "(" << (i - owned_space.min(0))
-			  << "," << (j - owned_space.min(1)) << "): ";
-		std::cout << rhs_host(i, j, 0) << "\n";
-	    }
-        }
-	std::cout << std::flush;
-#endif
+        Kokkos::Profiling::popRegion();
     }
 
     void _applyPressure()
     {
+        Kokkos::Profiling::pushRegion("VelocityCorrector::ApplyPressure");
         auto scale = _dt / (_density * _mesh->cellSize());
 
         // Modifies the current velocity field *in place* to be divergence free
@@ -267,12 +255,15 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
 	 * strictly larger than needed (only needs to be 1 deep and
 	 * not include corners), but we reuse the exiting halo
 	 * pattern for simplicity. */
+        Kokkos::Profiling::pushRegion("VelocityCorrector::ApplyPressure:Gather");
 	_pressure_halo->gather( ExecutionSpace(), *_lhs);
+        Kokkos::Profiling::popRegion();
 
 	const bc_type &bc = _bc;
 
         Kokkos::parallel_for(
-            "apply pressure", createExecutionPolicy( cell_space, ExecutionSpace() ),
+            "PressureVelocityCorrection", 
+            createExecutionPolicy( cell_space, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
                 u(i, j, 0) -= scale * (p(i, j, 0) - p(i-1, j  , 0));
                 v(i, j, 0) -= scale * (p(i, j, 0) - p(i,   j-1, 0));
@@ -281,6 +272,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
                 l2g(i, j, gi, gj); 
 		bc(Cell(), u, v, gi, gj, i, j);
             });
+        Kokkos::Profiling::popRegion();
     }
 
     void correctVelocity()
@@ -296,9 +288,7 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver> : public V
         _pressure_solver->solve( *_rhs, *_lhs );
         Kokkos::Profiling::popRegion();
 
-        Kokkos::Profiling::pushRegion("VelocityCorrector::ApplyPressure");
         _applyPressure();
-        Kokkos::Profiling::popRegion();
 
         Kokkos::Profiling::popRegion();
 

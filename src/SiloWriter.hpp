@@ -66,7 +66,10 @@ class SiloWriter {
         auto local_mesh = *(_pm->mesh()->localMesh());
 
 
+        Kokkos::Profiling::pushRegion("SiloWriter::WriteFile");
+
         // Set DB Options: Time Step, Time Stamp and Delta Time
+        Kokkos::Profiling::pushRegion("SiloWriter::WriteFile::SetupOptions");
         optlist = DBMakeOptlist( 10 );
         DBAddOption( optlist, DBOPT_CYCLE, &time_step );
         DBAddOption( optlist, DBOPT_TIME, &time );
@@ -75,9 +78,11 @@ class SiloWriter {
         DBAddOption( optlist, DBOPT_COORDSYS, &dbcoord );
 	int dborder = DB_ROWMAJOR;
 	DBAddOption( optlist, DBOPT_MAJORORDER, &dborder );
+        Kokkos::Profiling::popRegion();
 
         // Get the size of the local cell space and declare the 
 	// coordinates of the portion of the mesh we're writing
+        Kokkos::Profiling::pushRegion("SiloWriter::WriteFile::WriteMesh");
         auto cell_domain = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
         for (int i = 0; i < Dims; i++) {
@@ -107,6 +112,7 @@ class SiloWriter {
 
         DBPutQuadmesh( dbfile, meshname, (DBCAS_t)coordnames,
                        coords, dims, Dims, DB_DOUBLE, DB_COLLINEAR, optlist );
+        Kokkos::Profiling::popRegion();
 
 	// Now we write the individual variables associated with this 
 	// portion of the mesh, potentially copying them out of device space
@@ -114,6 +120,7 @@ class SiloWriter {
 
         // Advected quantity first - copy owned portion from the primary 
         // execution space to the host execution space
+        Kokkos::Profiling::pushRegion("SiloWriter::WriteFile::WriteQuantity");
         auto q = _pm->get( Cajita::Cell(), Field::Quantity(), Version::Current() );
 	auto xmin = cell_domain.min(0);
 	auto ymin = cell_domain.min(1);
@@ -136,7 +143,9 @@ class SiloWriter {
 
         DBPutQuadvar1( dbfile, "quantity", meshname, qHost.data(), zdims, Dims,
                        NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist );
+        Kokkos::Profiling::popRegion();
 
+        Kokkos::Profiling::pushRegion("SiloWriter::WriteFile::WriteVelocity");
         auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(), Version::Current() );
         auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(), Version::Current() );
 	
@@ -171,6 +180,7 @@ class SiloWriter {
 	vars[1] = vHost.data();
         DBPutQuadvar( dbfile, "velocity", meshname, Dims, (DBCAS_t)varnames, vars, zdims, 
                       Dims, NULL, 0, DB_DOUBLE, DB_ZONECENT, optlist);
+        Kokkos::Profiling::popRegion();
 
 	for (int i = 0; i < Dims; i++) {
             free(coords[i]);
@@ -178,6 +188,7 @@ class SiloWriter {
 
         // Free Option List
         DBFreeOptlist( optlist );
+        Kokkos::Profiling::popRegion(); // writeFile region
     };
 
     /**
@@ -189,12 +200,16 @@ class SiloWriter {
     static void *createSiloFile( const char *filename, const char *nsname, void *user_data ) {
 
         int     driver    = *( (int *)user_data );
+        Kokkos::Profiling::pushRegion("SiloWriter::CreateSiloFile");
+
         DBfile *silo_file = DBCreate( filename, DB_CLOBBER, DB_LOCAL, "CajitaFluidsRaw", driver );
 
         if ( silo_file ) {
             DBMkDir( silo_file, nsname );
             DBSetDir( silo_file, nsname );
         }
+
+        Kokkos::Profiling::popRegion();
 
         return (void *)silo_file;
     };
@@ -208,6 +223,7 @@ class SiloWriter {
      **/
     static void *openSiloFile( const char *filename, const char *nsname, 
 			       PMPIO_iomode_t ioMode, void *user_data ) {
+        Kokkos::Profiling::pushRegion("SiloWriter::openSiloFile");
         DBfile *silo_file = DBOpen( filename, DB_UNKNOWN, ioMode == PMPIO_WRITE ? DB_APPEND : DB_READ );
 
         if ( silo_file ) {
@@ -216,7 +232,7 @@ class SiloWriter {
             }
             DBSetDir( silo_file, nsname );
         }
-
+        Kokkos::Profiling::popRegion();
         return (void *)silo_file;
     };
 
@@ -226,8 +242,10 @@ class SiloWriter {
      * @param user_data File Driver/Type (PDB, HDF5)
      **/
     static void closeSiloFile( void *file, void *user_data ) {
+        Kokkos::Profiling::pushRegion("SiloWriter::closeSiloFile");
         DBfile *silo_file = (DBfile *)file;
         if ( silo_file ) DBClose( silo_file );
+        Kokkos::Profiling::popRegion();
     };
 
     /**
@@ -242,6 +260,7 @@ class SiloWriter {
      * @param file_ext File extension (PDB, HDF5)
      **/
     void writeMultiObjects( DBfile *silo_file, PMPIO_baton_t *baton, int size, int time_step, const char *file_ext ) {
+        Kokkos::Profiling::pushRegion("SiloWriter::writeMultiObjects");
         char **mesh_block_names = (char **)malloc( size * sizeof( char * ) );
         char **q_block_names    = (char **)malloc( size * sizeof( char * ) );
         char **v_block_names    = (char **)malloc( size * sizeof( char * ) );
@@ -278,6 +297,7 @@ class SiloWriter {
         free( v_block_names );
         free( block_types );
         free( var_types );
+        Kokkos::Profiling::popRegion();
     }
 
     // Function to Create New DB File for Current Time Step
@@ -300,7 +320,9 @@ class SiloWriter {
         char           masterfilename[256], filename[256], nsname[256];
         PMPIO_baton_t *baton;
 
+        Kokkos::Profiling::pushRegion("SiloWriter::siloWrite");
 
+        Kokkos::Profiling::pushRegion("SiloWriter::siloWrite::Setup");
         MPI_Comm_size( MPI_COMM_WORLD, &size );
         MPI_Bcast( &numGroups, 1, MPI_INT, 0, MPI_COMM_WORLD );
         MPI_Bcast( &driver, 1, MPI_INT, 0, MPI_COMM_WORLD );
@@ -314,20 +336,30 @@ class SiloWriter {
 
         // Show Errors and Force FLoating Point
         DBShowErrors( DB_ALL, NULL );
+        Kokkos::Profiling::popRegion();
 
+        Kokkos::Profiling::pushRegion("SiloWriter::siloWrite::batonWait");
         silo_file = (DBfile *)PMPIO_WaitForBaton( baton, filename, nsname );
+        Kokkos::Profiling::popRegion();
 
+        Kokkos::Profiling::pushRegion("SiloWriter::siloWrite::writeState");
         writeFile( silo_file, name, time_step, time, dt );
-
         if ( _pm->mesh()->rank() == 0 ) {
             master_file = DBCreate( masterfilename, DB_CLOBBER, DB_LOCAL, "CajitaFluids", driver );
             writeMultiObjects( master_file, baton, size, time_step, "pdb" );
             DBClose( master_file );
         }
+        Kokkos::Profiling::popRegion();
 
+        Kokkos::Profiling::pushRegion("SiloWriter::siloWrite::batonHandoff");
         PMPIO_HandOffBaton( baton, silo_file );
+        Kokkos::Profiling::popRegion();
 
+        Kokkos::Profiling::pushRegion("SiloWriter::siloWrite::finish");
         PMPIO_Finish( baton );
+        Kokkos::Profiling::popRegion();
+
+        Kokkos::Profiling::popRegion(); //siloWrite
     }
 
   private:
