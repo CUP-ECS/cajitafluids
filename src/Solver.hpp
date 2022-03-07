@@ -117,16 +117,20 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 	double time = 0.0;
 	int num_step;
 
+	Kokkos::Profiling::pushRegion("Solve");
+
 	_silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
+	Kokkos::Profiling::popRegion();
+
 	num_step = t_final / _dt;
 
 	while ( (time < t_final) ) 
 	{
 	    if ( 0 == _mesh->rank() && 0 == t % write_freq )
 		printf( "Step %d / %d at time = %f\n", t, num_step, time );
-
+	    
 	    // 1. Handle inflow and body forces.
-	    addExternalInputs();
+	    _addInputs();
 
 	    // 2. Adjust the velocity field to be divergence-free 
             _vc->correctVelocity();
@@ -147,7 +151,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
 
     /* Internal methods for the solver */
-    void addExternalInputs()
+    void _addInputs()
     {
         auto local_grid = *( _mesh->localGrid() );
         auto local_mesh = *( _mesh->localMesh() );
@@ -163,8 +167,9 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 	const BodyForce<2> &body = _body;
         const auto delta_t = _dt;
 
+	Kokkos::Profiling::pushRegion("Solve::AddInputs::Cell");
         auto quantity = _pm->get( Cell(), Field::Quantity(), Version::Current() );
-        Kokkos::parallel_for( "add external quantity",
+        Kokkos::parallel_for( "add cell quantity",
             createExecutionPolicy( owned_cells, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
 		int idx[2] = {i, j};
@@ -175,7 +180,9 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
                 source(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
                 body(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
             });
+	Kokkos::Profiling::popRegion();
 
+	Kokkos::Profiling::pushRegion("Solve::AddInputs::FaceI");
         auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
         auto ui  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
         auto l2g_facei = Cajita::IndexConversion::createL2G( local_grid, FaceI());
@@ -194,7 +201,9 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
                 body(FaceI(), ui, i, j, x, y, delta_t, cell_area);
                 bc(FaceI(), ui, gi, gj, i, j);
             });
+	Kokkos::Profiling::popRegion();
 
+	Kokkos::Profiling::pushRegion("Solve::AddInputs::FaceJ");
         auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
         auto uj  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
         auto l2g_facej = Cajita::IndexConversion::createL2G( local_grid, FaceJ());
@@ -212,6 +221,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
                 body(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
                 bc(FaceI(), uj, gi, gj, i, j);
             });
+	Kokkos::Profiling::popRegion();
     }
 
   private:
