@@ -17,14 +17,14 @@
 #include <Cajita_ReferenceStructuredSolver.hpp>
 #include <Cajita_Types.hpp>
 
-#include <Mesh.hpp>
-#include <ProblemManager.hpp>
+#include <BodyForce.hpp>
 #include <BoundaryConditions.hpp>
 #include <InflowSource.hpp>
-#include <BodyForce.hpp>
+#include <Mesh.hpp>
+#include <ProblemManager.hpp>
 #include <SiloWriter.hpp>
-#include <VelocityCorrector.hpp>
 #include <TimeIntegrator.hpp>
+#include <VelocityCorrector.hpp>
 
 #include <Kokkos_Core.hpp>
 #include <memory>
@@ -52,7 +52,8 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
   public:
     using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
     using mesh_type = Cajita::UniformMesh<double, 2>;
-    using cell_array = Cajita::Array<double, Cajita::Cell, mesh_type, MemorySpace>;
+    using cell_array =
+        Cajita::Array<double, Cajita::Cell, mesh_type, MemorySpace>;
     using pm_type = ProblemManager<2, ExecutionSpace, MemorySpace>;
     using bc_type = BoundaryCondition<2>;
 
@@ -64,158 +65,181 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
     Solver( MPI_Comm comm, const Kokkos::Array<double, 4>& global_bounding_box,
             const std::array<int, 2>& global_num_cell,
             const Cajita::BlockPartitioner<2>& partitioner,
-            const double density,
-            const InitFunc& create_functor,
-            const BoundaryCondition<2>& bc,
-	    const InflowSource<2> &source,
-            const BodyForce<2> &body,
-            const double delta_t,
-            const std::string &matrix_solver,
-            const std::string &preconditioner )
-        : _halo_min( 3 ), _density(density), _bc(bc), 
-	  _source(source), _body(body), _dt( delta_t)
+            const double density, const InitFunc& create_functor,
+            const BoundaryCondition<2>& bc, const InflowSource<2>& source,
+            const BodyForce<2>& body, const double delta_t,
+            const std::string& matrix_solver,
+            const std::string& preconditioner )
+        : _halo_min( 3 )
+        , _density( density )
+        , _bc( bc )
+        , _source( source )
+        , _body( body )
+        , _dt( delta_t )
     {
 
-        // Create a mesh one which to do the solve and a problem manager to handle state
+        // Create a mesh one which to do the solve and a problem manager to
+        // handle state
         _mesh = std::make_shared<Mesh<2, ExecutionSpace, MemorySpace>>(
-            global_bounding_box, global_num_cell, partitioner,
-            _halo_min, comm );
-	
+            global_bounding_box, global_num_cell, partitioner, _halo_min,
+            comm );
+
         // Check that our timestep is small enough to handle the mesh size
         // given and inflow/body forces under some very simple assumptions.
         // In the end, the user should give us sane input conditions.
-        auto forcemax = sqrt(body._force[0]*body._force[0]
-                             + body._force[1]*body._force[1]);
-        auto umax = fmax(fabs(source._velocity[0]), fabs(source._velocity[1])) +
-                    sqrt(forcemax* _mesh->cellSize());
-        if ((umax > 0)
-            && (_dt > _mesh->cellSize()/umax)) {
-            _dt = _mesh->cellSize()/umax;
+        auto forcemax = sqrt( body._force[0] * body._force[0] +
+                              body._force[1] * body._force[1] );
+        auto umax =
+            fmax( fabs( source._velocity[0] ), fabs( source._velocity[1] ) ) +
+            sqrt( forcemax * _mesh->cellSize() );
+        if ( ( umax > 0 ) && ( _dt > _mesh->cellSize() / umax ) )
+        {
+            _dt = _mesh->cellSize() / umax;
             std::cerr << "Reducting timestep to " << _dt
-                      <<  " given mesh size and inflow velocity.\n";
+                      << " given mesh size and inflow velocity.\n";
         }
 
-	// Put domain rane information into the boundary condition object
-	_bc.min = _mesh->minDomainGlobalCellIndex();
+        // Put domain rane information into the boundary condition object
+        _bc.min = _mesh->minDomainGlobalCellIndex();
         _bc.max = _mesh->maxDomainGlobalCellIndex();
 
-    	// Create a problem manager to manage mesh state
+        // Create a problem manager to manage mesh state
         _pm = std::make_shared<ProblemManager<2, ExecutionSpace, MemorySpace>>(
             ExecutionSpace(), _mesh, create_functor );
 
-	// Create a velocity corrector to enforce incompressibility
-	_vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>( _pm, _bc, _density, _dt, 
-                  matrix_solver, preconditioner);
+        // Create a velocity corrector to enforce incompressibility
+        _vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>(
+            _pm, _bc, _density, _dt, matrix_solver, preconditioner );
 
         // Set up Silo for I/O
-        _silo = std::make_shared<SiloWriter<2, ExecutionSpace, MemorySpace>>( _pm );
+        _silo =
+            std::make_shared<SiloWriter<2, ExecutionSpace, MemorySpace>>( _pm );
     }
 
     void solve( const double t_final, const int write_freq ) override
     {
         int t = 0;
-	double time = 0.0;
-	int num_step;
+        double time = 0.0;
+        int num_step;
 
-	_silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
-	num_step = t_final / _dt;
+        Kokkos::Profiling::pushRegion( "Solve" );
 
-	while ( (time < t_final) ) 
-	{
-	    if ( 0 == _mesh->rank() && 0 == t % write_freq )
-		printf( "Step %d / %d at time = %f\n", t, num_step, time );
+        _silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
+        Kokkos::Profiling::popRegion();
 
-	    // 1. Handle inflow and body forces.
-	    addExternalInputs();
+        num_step = t_final / _dt;
 
-	    // 2. Adjust the velocity field to be divergence-free 
+        while ( ( time < t_final ) )
+        {
+            if ( 0 == _mesh->rank() && 0 == t % write_freq )
+                printf( "Step %d / %d at time = %f\n", t, num_step, time );
+
+            // 1. Handle inflow and body forces.
+            _addInputs();
+
+            // 2. Adjust the velocity field to be divergence-free
             _vc->correctVelocity();
 
-            // 3. Advect the quantities forward a time step in the 
+            // 3. Advect the quantities forward a time step in the
             // computed velocity field
-	    TimeIntegrator::step<2>( ExecutionSpace(), *_pm, _dt, _bc );
+            TimeIntegrator::step<2>( ExecutionSpace(), *_pm, _dt, _bc );
 
-	    // 4. Output mesh state periodically
-	    if ( 0 == t % write_freq ) {
-		_silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
-	    }
-	    time += _dt;
-	    t++;
-	}
+            // 4. Output mesh state periodically
+            if ( 0 == t % write_freq )
+            {
+                _silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
+            }
+            time += _dt;
+            t++;
+        }
     }
 
-
-
     /* Internal methods for the solver */
-    void addExternalInputs()
+    void _addInputs()
     {
         auto local_grid = *( _mesh->localGrid() );
         auto local_mesh = *( _mesh->localMesh() );
-	double cell_size = _mesh->cellSize();
+        double cell_size = _mesh->cellSize();
         double cell_area = cell_size * cell_size;
 
-        auto owned_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(), Cajita::Local() );
+        auto owned_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(),
+                                                  Cajita::Local() );
 
-        // Create local variable versions of the class members to avoid needing to use a
-        // (potentially expensive) class lambda
-	const BoundaryCondition<2> &bc = _bc;
-	const InflowSource<2> &source = _source;
-	const BodyForce<2> &body = _body;
+        // Create local variable versions of the class members to avoid needing
+        // to use a (potentially expensive) class lambda
+        const BoundaryCondition<2>& bc = _bc;
+        const InflowSource<2>& source = _source;
+        const BodyForce<2>& body = _body;
         const auto delta_t = _dt;
 
-        auto quantity = _pm->get( Cell(), Field::Quantity(), Version::Current() );
-        Kokkos::parallel_for( "add external quantity",
+        Kokkos::Profiling::pushRegion( "Solve::AddInputs::Cell" );
+        auto quantity =
+            _pm->get( Cell(), Field::Quantity(), Version::Current() );
+        Kokkos::parallel_for(
+            "add cell quantity",
             createExecutionPolicy( owned_cells, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
-		int idx[2] = {i, j};
-		double loc[2];
-	        local_mesh.coordinates( Cell(), idx, loc);
-		double x = loc[0], y = loc[1];
+                int idx[2] = { i, j };
+                double loc[2];
+                local_mesh.coordinates( Cell(), idx, loc );
+                double x = loc[0], y = loc[1];
 
-                source(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
-                body(Cajita::Cell(), quantity, i, j, x, y, delta_t, cell_area);
-            });
+                source( Cajita::Cell(), quantity, i, j, x, y, delta_t,
+                        cell_area );
+                body( Cajita::Cell(), quantity, i, j, x, y, delta_t,
+                      cell_area );
+            } );
+        Kokkos::Profiling::popRegion();
 
-        auto owned_ifaces = local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
-        auto ui  = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
-        auto l2g_facei = Cajita::IndexConversion::createL2G( local_grid, FaceI());
+        Kokkos::Profiling::pushRegion( "Solve::AddInputs::FaceI" );
+        auto owned_ifaces =
+            local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
+        auto ui = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
+        auto l2g_facei =
+            Cajita::IndexConversion::createL2G( local_grid, FaceI() );
 
-        Kokkos::parallel_for( "add external x velocity",
+        Kokkos::parallel_for(
+            "add external x velocity",
             createExecutionPolicy( owned_ifaces, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
-		int idx[2] = {i, j};
+                int idx[2] = { i, j };
                 int gi, gj;
-		double loc[2];
-	        local_mesh.coordinates( FaceI(), idx, loc);
-		double x = loc[0], y = loc[1];
+                double loc[2];
+                local_mesh.coordinates( FaceI(), idx, loc );
+                double x = loc[0], y = loc[1];
 
-                l2g_facei(i, j, gi, gj);
-                source(FaceI(), ui, i, j, x, y, delta_t, cell_area);
-                body(FaceI(), ui, i, j, x, y, delta_t, cell_area);
-                bc(FaceI(), ui, gi, gj, i, j);
-            });
+                l2g_facei( i, j, gi, gj );
+                source( FaceI(), ui, i, j, x, y, delta_t, cell_area );
+                body( FaceI(), ui, i, j, x, y, delta_t, cell_area );
+                bc( FaceI(), ui, gi, gj, i, j );
+            } );
+        Kokkos::Profiling::popRegion();
 
-        auto owned_jfaces = local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
-        auto uj  = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
-        auto l2g_facej = Cajita::IndexConversion::createL2G( local_grid, FaceJ());
-        Kokkos::parallel_for( "add external y velocity",
+        Kokkos::Profiling::pushRegion( "Solve::AddInputs::FaceJ" );
+        auto owned_jfaces =
+            local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
+        auto uj = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
+        auto l2g_facej =
+            Cajita::IndexConversion::createL2G( local_grid, FaceJ() );
+        Kokkos::parallel_for(
+            "add external y velocity",
             createExecutionPolicy( owned_jfaces, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
-		int idx[2] = {i, j};
+                int idx[2] = { i, j };
                 int gi, gj;
-		double loc[2];
-	        local_mesh.coordinates( FaceJ(), idx, loc);
-		double x = loc[0], y = loc[1];
+                double loc[2];
+                local_mesh.coordinates( FaceJ(), idx, loc );
+                double x = loc[0], y = loc[1];
 
-                l2g_facej(i, j, gi, gj);
-                source(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
-                body(FaceJ(), uj, i, j, x, y, delta_t, cell_area);
-                bc(FaceI(), uj, gi, gj, i, j);
-            });
+                l2g_facej( i, j, gi, gj );
+                source( FaceJ(), uj, i, j, x, y, delta_t, cell_area );
+                body( FaceJ(), uj, i, j, x, y, delta_t, cell_area );
+                bc( FaceI(), uj, gi, gj, i, j );
+            } );
+        Kokkos::Profiling::popRegion();
     }
 
   private:
-
     /* Solver state variables */
     double _dt;
     double _density;
@@ -238,37 +262,34 @@ createSolver( const std::string& device, MPI_Comm comm,
               const Kokkos::Array<double, 4>& global_bounding_box,
               const std::array<int, 2>& global_num_cell,
               const Cajita::BlockPartitioner<2>& partitioner,
-              const double density,
-              const InitFunc& create_functor,
-              const BoundaryCondition<2>& bc,
-              const InflowSource<2>& source,
-              const BodyForce<2>& body,
-              const double delta_t,
-              const std::string &matrix_solver, 
-              const std::string &preconditioner) 
+              const double density, const InitFunc& create_functor,
+              const BoundaryCondition<2>& bc, const InflowSource<2>& source,
+              const BodyForce<2>& body, const double delta_t,
+              const std::string& matrix_solver,
+              const std::string& preconditioner )
 {
     if ( 0 == device.compare( "serial" ) )
     {
 // Hypre with CUDA support breaks support for the serial solver. We'll need
 // to set it up to use a different solver in that case
-#if defined(KOKKOS_ENABLE_SERIAL) && !defined(KOKKOS_ENABLE_CUDA)
+#if defined( KOKKOS_ENABLE_SERIAL ) && !defined( KOKKOS_ENABLE_CUDA )
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::Serial, Kokkos::HostSpace>>(
-            comm, global_bounding_box, global_num_cell, partitioner,
-            density, create_functor, bc, source, body, delta_t,
-            matrix_solver, preconditioner);
+            comm, global_bounding_box, global_num_cell, partitioner, density,
+            create_functor, bc, source, body, delta_t, matrix_solver,
+            preconditioner );
 #else
         throw std::runtime_error( "Serial Backend Not Enabled" );
 #endif
     }
     else if ( 0 == device.compare( "openmp" ) )
     {
-#if defined(KOKKOS_ENABLE_OPENMP) && !defined(KOKKOS_ENABLE_CUDA)
+#if defined( KOKKOS_ENABLE_OPENMP ) && !defined( KOKKOS_ENABLE_CUDA )
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::OpenMP, Kokkos::HostSpace>>(
-            comm, global_bounding_box, global_num_cell, partitioner,
-            density, create_functor, bc, source, body, delta_t,
-            matrix_solver, preconditioner );
+            comm, global_bounding_box, global_num_cell, partitioner, density,
+            create_functor, bc, source, body, delta_t, matrix_solver,
+            preconditioner );
 #else
         throw std::runtime_error( "OpenMP Backend Not Enabled" );
 #endif
@@ -278,9 +299,9 @@ createSolver( const std::string& device, MPI_Comm comm,
 #ifdef KOKKOS_ENABLE_CUDA
         return std::make_shared<
             CajitaFluids::Solver<2, Kokkos::Cuda, Kokkos::CudaSpace>>(
-            comm, global_bounding_box, global_num_cell, partitioner,
-            density, create_functor, bc, source, body, delta_t,
-            matrix_solver, preconditioner );
+            comm, global_bounding_box, global_num_cell, partitioner, density,
+            create_functor, bc, source, body, delta_t, matrix_solver,
+            preconditioner );
 #else
         throw std::runtime_error( "CUDA Backend Not Enabled" );
 #endif
@@ -288,11 +309,11 @@ createSolver( const std::string& device, MPI_Comm comm,
     else if ( 0 == device.compare( "hip" ) )
     {
 #ifdef KOKKOS_ENABLE_HIP
-        return std::make_shared<CajitaFluids::Solver<2, Kokkos:Experimental::HIP, 
-                                                     Kokkos::Experimental::HIPSpace>>(
-            comm, global_bounding_box, global_num_cell, partitioner,
-            density, create_functor, bc, source, body, delta_t,
-            matrix_solver, preconditioner  );
+        return std::make_shared<CajitaFluids::Solver<
+            2, Kokkos : Experimental::HIP, Kokkos::Experimental::HIPSpace>>(
+            comm, global_bounding_box, global_num_cell, partitioner, density,
+            create_functor, bc, source, body, delta_t, matrix_solver,
+            preconditioner );
 #else
         throw std::runtime_error( "HIP Backend Not Enabled" );
 #endif
