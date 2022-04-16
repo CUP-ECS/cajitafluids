@@ -38,11 +38,10 @@ class Mesh
     using mesh_type = Cajita::UniformMesh<double, Dim>;
 
     // Construct a mesh.
-    Mesh( const Kokkos::Array<double, 2*Dim>& global_bounding_box,
+    Mesh( const Kokkos::Array<double, 2 * Dim>& global_bounding_box,
           const std::array<int, Dim>& global_num_cell,
           const Cajita::BlockPartitioner<Dim>& partitioner,
-          const int halo_cell_width, 
-          MPI_Comm comm )
+          const int halo_cell_width, MPI_Comm comm )
     {
         // Make a copy of the global number of cells so we can modify it.
         std::array<int, Dim> num_cell = global_num_cell;
@@ -51,9 +50,9 @@ class Mesh
         double cell_size =
             ( global_bounding_box[Dim] - global_bounding_box[0] ) / num_cell[0];
 
-        // Because the mesh is uniform width in all directions, check that the 
-        // domain is evenly divisible by the cell size in each dimension 
-        // within round-off error. 
+        // Because the mesh is uniform width in all directions, check that the
+        // domain is evenly divisible by the cell size in each dimension
+        // within round-off error.
         for ( int d = 0; d < Dim; ++d )
         {
             double extent = num_cell[d] * cell_size;
@@ -66,7 +65,8 @@ class Mesh
 
         // Create global mesh bounds.
         std::array<double, Dim> global_low_corner, global_high_corner;
-        for ( int d = 0; d < Dim; ++d ) {
+        for ( int d = 0; d < Dim; ++d )
+        {
             global_low_corner[d] = global_bounding_box[d];
             global_high_corner[d] = global_bounding_box[d + Dim];
         }
@@ -83,7 +83,8 @@ class Mesh
 
         // Build the global grid.
         std::array<bool, Dim> periodic;
-        for (int i = 0; i < Dim; i++) periodic[i] = false;
+        for ( int i = 0; i < Dim; i++ )
+            periodic[i] = false;
 
         auto global_grid = Cajita::createGlobalGrid( comm, global_mesh,
                                                      periodic, partitioner );
@@ -93,15 +94,16 @@ class Mesh
         _local_grid = Cajita::createLocalGrid( global_grid, halo_width );
 
         // Build the local mesh. XXX Why is this hard to share? Is it expensive?
-	auto local_mesh = Cajita::createLocalMesh<device_type>( *_local_grid );
-        _local_mesh = std::make_shared<Cajita::LocalMesh<device_type, mesh_type>>(local_mesh);
+        auto local_mesh = Cajita::createLocalMesh<device_type>( *_local_grid );
+        _local_mesh =
+            std::make_shared<Cajita::LocalMesh<device_type, mesh_type>>(
+                local_mesh );
 
-        MPI_Comm_rank(comm, &_rank);
+        MPI_Comm_rank( comm, &_rank );
     }
 
     // Get the local grid.
-    const std::shared_ptr<Cajita::LocalGrid<mesh_type>>&
-    localGrid() const
+    const std::shared_ptr<Cajita::LocalGrid<mesh_type>>& localGrid() const
     {
         return _local_grid;
     }
@@ -131,10 +133,7 @@ class Mesh
         return _max_domain_global_cell_index;
     }
 
-    int rank() const
-    {
-        return _rank;
-    }
+    int rank() const { return _rank; }
 
   public:
     std::shared_ptr<Cajita::LocalGrid<mesh_type>> _local_grid;

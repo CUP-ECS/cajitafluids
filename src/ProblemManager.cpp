@@ -15,7 +15,8 @@
 namespace CajitaFluids
 {
 //---------------------------------------------------------------------------//
-template class ProblemManager<2, Kokkos::DefaultHostExecutionSpace, Kokkos::HostSpace>;
+template class ProblemManager<2, Kokkos::DefaultHostExecutionSpace,
+                              Kokkos::HostSpace>;
 
 //---------------------------------------------------------------------------//
 

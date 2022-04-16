@@ -12,44 +12,45 @@
 #ifndef CAJITAFLUIDS_INTERPOLATION_HPP
 #define CAJITAFLUIDS_INTERPOLATION_HPP
 
-#include <ProblemManager.hpp>
 #include <Cajita.hpp>
+#include <ProblemManager.hpp>
 
 #include <Kokkos_Core.hpp>
-
 
 namespace CajitaFluids
 {
 namespace Interpolation
-{ 
+{
 using Cell = Cajita::Cell;
 using FaceI = Cajita::Face<Cajita::Dim::I>;
 using FaceJ = Cajita::Face<Cajita::Dim::J>;
 using FaceK = Cajita::Face<Cajita::Dim::K>;
-  
+
 // Spline to interpolate values for advection.
-template <std::size_t NumSpaceDims, std::size_t order, class Entity_t, class Mesh_t, class View_t>
-KOKKOS_INLINE_FUNCTION
-double interpolateField(const double loc[NumSpaceDims], 
-                        const Mesh_t &local_mesh, 
-                        const View_t &field)
+template <std::size_t NumSpaceDims, std::size_t order, class Entity_t,
+          class Mesh_t, class View_t>
+KOKKOS_INLINE_FUNCTION double interpolateField( const double loc[NumSpaceDims],
+                                                const Mesh_t& local_mesh,
+                                                const View_t& field )
 {
     double value;
     Cajita::SplineData<double, order, NumSpaceDims, Entity_t> spline;
-    Cajita::evaluateSpline(local_mesh, loc, spline);
-    Cajita::G2P::value(field, spline, value);
+    Cajita::evaluateSpline( local_mesh, loc, spline );
+    Cajita::G2P::value( field, spline, value );
     return value;
 }
 
-template <std::size_t NumSpaceDims, std::size_t order, class Mesh_t, class View_t>
-KOKKOS_INLINE_FUNCTION
-void interpolateVelocity(const double loc[NumSpaceDims], 
-                         const Mesh_t &local_mesh,
-		         const View_t u, const View_t v, 
-		         double velocity[NumSpaceDims])
+template <std::size_t NumSpaceDims, std::size_t order, class Mesh_t,
+          class View_t>
+KOKKOS_INLINE_FUNCTION void interpolateVelocity( const double loc[NumSpaceDims],
+                                                 const Mesh_t& local_mesh,
+                                                 const View_t u, const View_t v,
+                                                 double velocity[NumSpaceDims] )
 {
-    velocity[0] = interpolateField<NumSpaceDims, order, FaceI>(loc, local_mesh, u);
-    velocity[1] = interpolateField<NumSpaceDims, order, FaceJ>(loc, local_mesh, v);
+    velocity[0] =
+        interpolateField<NumSpaceDims, order, FaceI>( loc, local_mesh, u );
+    velocity[1] =
+        interpolateField<NumSpaceDims, order, FaceJ>( loc, local_mesh, v );
 }
 
 } // end namespace Interpolation
