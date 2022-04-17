@@ -1,12 +1,13 @@
-# Simple generic spack environment specification for code needed to run CajitaFluids on non-CUDA systems.
-# In general we want to let spack figure out the right version and options for heffte and hypre and MPI
-# so we don't specify them here. On particular systems, you may want to specify them directly.
+# Simple generic spack environment specification for code needed to run 
+# CajitaFluids on non-CUDA systems. In general we want to let spack figure 
+# out the right version and options for hypre and MPI so we don't specify 
+# them here. On particular systems, you may want to specify them directly.
 spack:
   specs:
   - hdf5+mpi
   - silo@4.11 # Speficy a specific version because some of the bsd licensed versions don't build
-  - googletest
+  - hypre-cmake +mpi
   - kokkos std=17
-  - cabana +hypre +heffte +mpi
+  - cabana +hypre +mpi
   concretization: together
   view: true
