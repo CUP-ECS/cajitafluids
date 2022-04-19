@@ -6,6 +6,10 @@ on: [push, pull_request]
 #  pull_request:
 #    branches: [ develop, main ]
 
+defaults:
+  run:
+    shell: /bin/bash -el {0}
+
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: RelWithDebInfo
@@ -19,9 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/cup-ecs/cajitafluids-nocuda:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.github_token }}
+      #credentials:
+      #  username: ${{ github.actor }}
+      #  password: ${{ secrets.github_token }}
 
     steps:
     - uses: actions/checkout@v3
@@ -32,7 +36,7 @@ jobs:
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build
       # Build your program with the given configuration
