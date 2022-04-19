@@ -14,14 +14,6 @@ on: [push, pull_request]
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: RelWithDebInfo
-  # Customize the environemnt to pick up the needed spack view and modules
-  SPACK_ENV: /opt/spack-environment;
-  ACLOCAL_PATH: /opt/view/share/aclocal;
-  CMAKE_PREFIX_PATH: /opt/view;
-  LD_LIBRARY_PATH: /opt/view/lib:/opt/view/lib64;
-  MANPATH: /opt/view/share/man:/opt/view/man:;
-  PATH: /opt/view/bin:/opt/spack/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-  PKG_CONFIG_PATH: /opt/view/lib/pkgconfig:/opt/view/share/pkgconfig:/opt/view/lib64/pkgconfig;
 
 jobs:
   build:
@@ -35,6 +27,15 @@ jobs:
       #credentials:
       #  username: ${{ github.actor }}
       #  password: ${{ secrets.github_token }}
+      env: 
+        # Customize the environemnt to pick up the needed spack view and modules
+        SPACK_ENV: "/opt/spack-environment"
+        ACLOCAL_PATH: "/opt/view/share/aclocal"
+        CMAKE_PREFIX_PATH: "/opt/view"
+        LD_LIBRARY_PATH: "/opt/view/lib:/opt/view/lib64"
+        MANPATH: "/opt/view/share/man:/opt/view/man:/usr/man"
+        PATH: "/opt/view/bin:/opt/spack/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        PKG_CONFIG_PATH: "/opt/view/lib/pkgconfig:/opt/view/share/pkgconfig:/opt/view/lib64/pkgconfig"
 
     steps:
     - uses: actions/checkout@v3
