@@ -1,0 +1,58 @@
+name: CMake Build and Test
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+
+# We have to run in a login shell to get the spack environment in the container set up
+#defaults:
+#  run:
+#    shell: /bin/bash -el {0}
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: RelWithDebInfo
+
+jobs:
+  build:
+    # The CMake configure and build commands are platform agnostic and should 
+    # work equally well on Windows or Mac. Convert this to a matrix build later
+    # to include cuda and cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/cup-ecs/cajitafluids-nocuda:latest
+      #credentials:
+      #  username: ${{ github.actor }}
+      #  password: ${{ secrets.github_token }}
+      env: 
+        # Customize the environemnt to pick up the needed spack view and modules
+        SPACK_ENV: "/opt/spack-environment"
+        ACLOCAL_PATH: "/opt/view/share/aclocal"
+        CMAKE_PREFIX_PATH: "/opt/view"
+        LD_LIBRARY_PATH: "/opt/view/lib:/opt/view/lib64"
+        MANPATH: "/opt/view/share/man:/opt/view/man:/usr/man"
+        PATH: "/opt/view/bin:/opt/spack/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        PKG_CONFIG_PATH: "/opt/view/lib/pkgconfig:/opt/view/share/pkgconfig:/opt/view/lib64/pkgconfig"
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Configure CMake
+      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build Program
+      # Build your program with the given configuration
+      run: cmake --build build --config ${{env.BUILD_TYPE}}
+
+    - name: Test Program
+      working-directory: build
+      # Execute tests defined by the CMake configuration.  
+      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
+      run: ctest -C ${{env.BUILD_TYPE}}
