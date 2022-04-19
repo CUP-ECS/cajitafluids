@@ -161,7 +161,16 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
 {
 
     /// Set default values
+
+    // If we're using CUDA, then HYPRE is cuda-enabled, state must exist on
+    // the device, and serial won't work so make cuda the default
+    // If we're 
+#ifdef KOKKOS_ENABLE_CUDA
+    cl.device = "cuda"; // Default Thread Setting
+#else
     cl.device = "serial"; // Default Thread Setting
+#endif
+
     cl.t_final = 4.0;
     cl.delta_t = 0.005;
     cl.write_freq = 20;
@@ -174,8 +183,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
     cl.density = 0.1;
     cl.gravity = 0.0;
 
+    // Default to the Hypre conjugate gradient solver with a sophisticated
+    // preconditioner
     cl.solver = "PCG";
-    cl.precon = "Jacobi";
+    cl.precon = "PFMG";
 
     int ch;
     // Now parse any arguments
@@ -188,8 +199,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.global_num_cells[0] = atoi( optarg );
             if ( cl.global_num_cells[0] <= 0 )
             {
-                std::cerr << "Invalid cell number argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid cell number argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             cl.global_num_cells[1] = cl.global_num_cells[0];
@@ -199,8 +212,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
 
             if ( cl.global_bounding_box[3] <= 0.0 )
             {
-                std::cerr << "Invalid bounding box size argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid bounding box size argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             cl.global_bounding_box[0] = 0.0;
@@ -211,8 +226,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.t_final = atof( optarg );
             if ( cl.t_final <= 0.0 )
             {
-                std::cerr << "Invalid final time argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid final time argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             break;
@@ -220,8 +237,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.delta_t = atof( optarg );
             if ( cl.t_final <= 0.0 )
             {
-                std::cerr << "Invalid timestep increment argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid timestep increment argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             break;
@@ -241,10 +260,21 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
                  ( cl.device.compare( "openmp" ) != 0 ) &&
                  ( cl.device.compare( "pthreads" ) != 0 ) )
             {
-                std::cerr << "Invalid  parallel device argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid  parallel device argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
+#ifdef KOKKOS_ENABLE_CUDA
+            if (cl.device.compare( "cuda" ) != 0 ) {
+                if (rank == 0) {
+                    std::cerr << "CUDA device  must be used when Kokkos\n" 
+                              << "and HYPRE are configured with CUDA support.\n";
+                }
+                exit( -1 );
+            }
+#endif
             break;
         case 'g':
             cl.gravity = atof( optarg );
@@ -263,8 +293,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.inLocation[0] = atof( optarg );
             if ( cl.inLocation[0] < 0.0 )
             {
-                std::cerr << "Invalid inflow x argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid inflow x argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             break;
@@ -272,8 +304,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.inLocation[1] = atof( optarg );
             if ( cl.inLocation[1] < 0.0 )
             {
-                std::cerr << "Invalid inflow y argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid inflow y argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             break;
@@ -281,8 +315,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.inSize[0] = atof( optarg );
             if ( cl.inSize[0] <= 0.0 )
             {
-                std::cerr << "Invalid inflow width argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid inflow width argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             break;
@@ -290,8 +326,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.inSize[1] = atof( optarg );
             if ( cl.inSize[1] <= 0.0 )
             {
-                std::cerr << "Invalid inflow height argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid inflow height argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             break;
@@ -299,8 +337,10 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.inQuantity = atof( optarg );
             if ( cl.inQuantity < 0.0 )
             {
-                std::cerr << "Invalid inflow quantity argument.\n";
-                help( rank, argv[0] );
+                if (rank == 0) {
+                    std::cerr << "Invalid inflow quantity argument.\n";
+                    help( rank, argv[0] );
+                }
                 exit( -1 );
             }
             break;
@@ -311,8 +351,11 @@ int parseInput( const int rank, const int argc, char** argv, ClArgs& cl )
             cl.inVelocity[1] = atof( optarg );
             break;
         default:
-            std::cerr << "Invalid argument.\n";
-            help( rank, argv[0] );
+            if (rank == 0) {
+                std::cerr << "Invalid argument.\n";
+                help( rank, argv[0] );
+            }
+            exit( -1 );
             break;
         }
     }
