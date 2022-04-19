@@ -1,4 +1,4 @@
-name: CMake
+name: CMake Build and Test
 
 on: [push, pull_request]
 
@@ -7,13 +7,21 @@ on: [push, pull_request]
 #    branches: [ develop, main ]
 
 # We have to run in a login shell to get the spack environment in the container set up
-defaults:
-  run:
-    shell: /bin/bash -el {0}
+#defaults:
+#  run:
+#    shell: /bin/bash -el {0}
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: RelWithDebInfo
+  # Customize the environemnt to pick up the needed spack view and modules
+  SPACK_ENV: /opt/spack-environment;
+  ACLOCAL_PATH: /opt/view/share/aclocal;
+  CMAKE_PREFIX_PATH: /opt/view;
+  LD_LIBRARY_PATH: /opt/view/lib:/opt/view/lib64;
+  MANPATH: /opt/view/share/man:/opt/view/man:;
+  PATH: /opt/view/bin:/opt/spack/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  PKG_CONFIG_PATH: /opt/view/lib/pkgconfig:/opt/view/share/pkgconfig:/opt/view/lib64/pkgconfig;
 
 jobs:
   build:
