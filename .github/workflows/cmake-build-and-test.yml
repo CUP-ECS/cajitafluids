@@ -6,6 +6,7 @@ on: [push, pull_request]
 #  pull_request:
 #    branches: [ develop, main ]
 
+# We have to run in a login shell to get the spack environment in the container set up
 defaults:
   run:
     shell: /bin/bash -el {0}
@@ -29,9 +30,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-
-    - name: Check CMake Version
-      run: cmake --version
+      with:
+        submodules: recursive
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
