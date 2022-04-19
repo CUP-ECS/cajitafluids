@@ -91,7 +91,7 @@ class SiloWriter
         auto cell_domain = local_grid->indexSpace(
             Cajita::Own(), Cajita::Cell(), Cajita::Local() );
 
-        for ( int i = 0; i < Dims; i++ )
+        for ( unsigned int i = 0; i < Dims; i++ )
         {
             zdims[i] = cell_domain.extent( i ); // zones (cells) in a dimension
             dims[i] = zdims[i] + 1;             // nodes in a dimension
@@ -99,13 +99,13 @@ class SiloWriter
         }
 
         // Allocate coordinate arrays in each dimension
-        for ( int i = 0; i < Dims; i++ )
+        for ( unsigned int i = 0; i < Dims; i++ )
         {
             coords[i] = (double*)malloc( sizeof( double ) * dims[i] );
         }
 
         // Fill out coords[] arrays with coordinate values in each dimension
-        for ( int d = 0; d < Dims; d++ )
+        for ( unsigned int d = 0; d < Dims; d++ )
         {
             for ( int i = cell_domain.min( d ); i < cell_domain.max( d ) + 1;
                   i++ )
@@ -113,7 +113,7 @@ class SiloWriter
                 int iown = i - cell_domain.min( d );
                 int index[Dims];
                 double location[Dims];
-                for ( int j = 0; j < Dims; j++ )
+                for ( unsigned int j = 0; j < Dims; j++ )
                     index[j] = 0;
                 index[d] = i;
                 local_mesh.coordinates( Cajita::Node(), index, location );
@@ -202,7 +202,7 @@ class SiloWriter
                       optlist );
         Kokkos::Profiling::popRegion();
 
-        for ( int i = 0; i < Dims; i++ )
+        for ( unsigned int i = 0; i < Dims; i++ )
         {
             free( coords[i] );
         }
@@ -247,7 +247,8 @@ class SiloWriter
      * @param user_data File Driver/Type (PDB, HDF5)
      **/
     static void* openSiloFile( const char* filename, const char* nsname,
-                               PMPIO_iomode_t ioMode, void* user_data )
+                               PMPIO_iomode_t ioMode, 
+                               [[maybe_unused]] void* user_data )
     {
         Kokkos::Profiling::pushRegion( "SiloWriter::openSiloFile" );
         DBfile* silo_file = DBOpen(
@@ -270,7 +271,7 @@ class SiloWriter
      * @param file File pointer
      * @param user_data File Driver/Type (PDB, HDF5)
      **/
-    static void closeSiloFile( void* file, void* user_data )
+    static void closeSiloFile( void* file, [[maybe_unused]] void* user_data )
     {
         Kokkos::Profiling::pushRegion( "SiloWriter::closeSiloFile" );
         DBfile* silo_file = (DBfile*)file;

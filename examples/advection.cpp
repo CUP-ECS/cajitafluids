@@ -65,7 +65,7 @@ static option longargs[] = {
     { "input-velocity-y", required_argument, NULL, 'v' },
 
     { "help", no_argument, NULL, 'j' },
-    { 0 } };
+    { 0, 0, 0, 0 } };
 
 /**
  * @struct ClArgs
@@ -394,7 +394,8 @@ struct MeshInitFunc
 
     KOKKOS_INLINE_FUNCTION
     bool operator()( Cajita::Cell, CajitaFluids::Field::Quantity,
-                     const int index[Dim], const double x[Dim],
+                     [[maybe_unused]] const int index[Dim], 
+                     [[maybe_unused]] const double x[Dim],
                      double& quantity ) const
     {
         quantity = _q;
@@ -403,24 +404,29 @@ struct MeshInitFunc
     };
     KOKKOS_INLINE_FUNCTION
     bool operator()( Cajita::Face<Cajita::Dim::I>,
-                     CajitaFluids::Field::Velocity, const int index[Dim],
-                     const double x[Dim], double& xvelocity ) const
+                     CajitaFluids::Field::Velocity, 
+                     [[maybe_unused]] const int index[Dim],
+                     [[maybe_unused]] const double x[Dim], 
+                     double& xvelocity ) const
     {
         xvelocity = _u[0];
         return true;
     };
     KOKKOS_INLINE_FUNCTION
     bool operator()( Cajita::Face<Cajita::Dim::J>,
-                     CajitaFluids::Field::Velocity, const int index[Dim],
-                     const double x[Dim], double& yvelocity ) const
+                     CajitaFluids::Field::Velocity, 
+                     [[maybe_unused]] const int index[Dim],
+                     [[maybe_unused]] const double x[Dim], 
+                     double& yvelocity ) const
     {
         yvelocity = _u[1];
         return true;
     }
 #if 0
     KOKKOS_INLINE_FUNCTION
-    bool operator()( Cajita::Face<Cajita::Dim::K>, const int coords[Dim], 
-		     const int x[Dim], 
+    bool operator()( Cajita::Face<Cajita::Dim::K>, 
+                     [[maybe_unused]] const int coords[Dim], 
+		     [[maybe_unused]] const int x[Dim], 
 	             double &zvelocity ) const {
 	zvelocity = _uz;
         return true;

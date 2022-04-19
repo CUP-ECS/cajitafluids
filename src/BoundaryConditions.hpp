@@ -101,8 +101,8 @@ struct BoundaryCondition<2>
     // indexes. As result the comparisons end up being slighty different.
     template <class UType>
     KOKKOS_INLINE_FUNCTION void operator()( FaceI, UType& u, const int gi,
-                                            const int gj, const int i,
-                                            const int j ) const
+                                            [[maybe_unused]] const int gj, 
+                                            const int i, const int j ) const
     {
         if ( ( gi <= min[0] ) && ( boundary_type[0] == BoundaryType::SOLID ) )
         {
@@ -114,7 +114,8 @@ struct BoundaryCondition<2>
         }
     }
     template <class VType>
-    KOKKOS_INLINE_FUNCTION void operator()( FaceJ, VType& v, const int gi,
+    KOKKOS_INLINE_FUNCTION void operator()( FaceJ, VType& v, 
+                                            [[maybe_unused]] const int gi,
                                             const int gj, const int i,
                                             const int j ) const
     {

@@ -33,7 +33,8 @@ struct InflowSource<2>
     template <class ArrayType>
     KOKKOS_INLINE_FUNCTION void operator()( Cajita::Cell, ArrayType& q, int i,
                                             int j, double x, double y,
-                                            double delta_t, double v ) const
+                                            [[maybe_unused]] double delta_t,
+                                            [[maybe_unused]] double v ) const
     {
         /* Check if we're inside the bounding box for the inflow XXX */
         if ( x >= _bounding_box[0] && x < _bounding_box[2] &&
@@ -51,7 +52,8 @@ struct InflowSource<2>
     template <class ArrayType>
     KOKKOS_INLINE_FUNCTION void
     operator()( Cajita::Face<Cajita::Dim::I>, ArrayType& ux, int i, int j,
-                double x, double y, double delta_t, double v ) const
+                double x, double y, [[maybe_unused]] double delta_t, 
+                [[maybe_unused]] double v ) const
     {
         if ( x >= _bounding_box[0] && x < _bounding_box[2] &&
              y >= _bounding_box[1] && y < _bounding_box[3] )
@@ -64,7 +66,8 @@ struct InflowSource<2>
     template <class ArrayType>
     KOKKOS_INLINE_FUNCTION void
     operator()( Cajita::Face<Cajita::Dim::J>, ArrayType& uy, int i, int j,
-                double x, double y, double delta_t, double v ) const
+                double x, double y, [[maybe_unused]] double delta_t, 
+                [[maybe_unused]] double v ) const
     {
         if ( x >= _bounding_box[0] && x < _bounding_box[2] &&
              y >= _bounding_box[1] && y < _bounding_box[3] )
