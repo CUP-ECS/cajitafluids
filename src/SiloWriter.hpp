@@ -63,7 +63,8 @@ class SiloWriter
     {
         // Initialize Variables
         int dims[Dims], zdims[Dims];
-        double *coords[Dims], *vars[Dims], spacing[Dims];
+        double *coords[Dims], *vars[Dims];
+        // double *spacing[Dims];
         const char* coordnames[3] = { "X", "Y", "Z" };
         DBoptlist* optlist;
 
@@ -95,7 +96,7 @@ class SiloWriter
         {
             zdims[i] = cell_domain.extent( i ); // zones (cells) in a dimension
             dims[i] = zdims[i] + 1;             // nodes in a dimension
-            spacing[i] = _pm->mesh()->cellSize(); // uniform mesh
+            // spacing[i] = _pm->mesh()->cellSize(); // uniform mesh
         }
 
         // Allocate coordinate arrays in each dimension
@@ -247,7 +248,7 @@ class SiloWriter
      * @param user_data File Driver/Type (PDB, HDF5)
      **/
     static void* openSiloFile( const char* filename, const char* nsname,
-                               PMPIO_iomode_t ioMode, 
+                               PMPIO_iomode_t ioMode,
                                [[maybe_unused]] void* user_data )
     {
         Kokkos::Profiling::pushRegion( "SiloWriter::openSiloFile" );

@@ -394,7 +394,7 @@ struct MeshInitFunc
 
     KOKKOS_INLINE_FUNCTION
     bool operator()( Cajita::Cell, CajitaFluids::Field::Quantity,
-                     [[maybe_unused]] const int index[Dim], 
+                     [[maybe_unused]] const int index[Dim],
                      [[maybe_unused]] const double x[Dim],
                      double& quantity ) const
     {
@@ -404,9 +404,9 @@ struct MeshInitFunc
     };
     KOKKOS_INLINE_FUNCTION
     bool operator()( Cajita::Face<Cajita::Dim::I>,
-                     CajitaFluids::Field::Velocity, 
+                     CajitaFluids::Field::Velocity,
                      [[maybe_unused]] const int index[Dim],
-                     [[maybe_unused]] const double x[Dim], 
+                     [[maybe_unused]] const double x[Dim],
                      double& xvelocity ) const
     {
         xvelocity = _u[0];
@@ -414,9 +414,9 @@ struct MeshInitFunc
     };
     KOKKOS_INLINE_FUNCTION
     bool operator()( Cajita::Face<Cajita::Dim::J>,
-                     CajitaFluids::Field::Velocity, 
+                     CajitaFluids::Field::Velocity,
                      [[maybe_unused]] const int index[Dim],
-                     [[maybe_unused]] const double x[Dim], 
+                     [[maybe_unused]] const double x[Dim],
                      double& yvelocity ) const
     {
         yvelocity = _u[1];

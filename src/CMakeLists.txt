@@ -19,6 +19,7 @@ set(DEPENDS_ON
   Cabana::cabanacore
   Cabana::Cajita
   Silo::silo 
+  mpi
   )
  
 set(INCLUDES

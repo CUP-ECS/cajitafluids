@@ -13,8 +13,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 # interested in.
 # Build options
 set(ENABLE_MPI ON CACHE BOOL "Build MPI support")
-set(ENABLE_OPENMP OFF CACHE BOOL "Build OpenMP support")
-set(ENABLE_CUDA OFF CACHE BOOL "Build CUDA support")
 set(ENABLE_CLANG_CUDA "Use Clang's native CUDA support" ON)
 
 # Build options for libraries, disable extras

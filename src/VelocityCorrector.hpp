@@ -278,7 +278,6 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
 
     std::shared_ptr<cell_array> _lhs;
     std::shared_ptr<cell_array> _rhs;
-
 };
 
 template <std::size_t NumSpaceDims, class ExecutionSpace, class MemorySpace,

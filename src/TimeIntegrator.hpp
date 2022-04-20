@@ -81,7 +81,7 @@ rk3( const double x0[NumSpaceDims], const Mesh_t& local_mesh, const View_t& u,
 template <std::size_t NumSpaceDims, class ProblemManagerType,
           class ExecutionSpace, class Entity_t, class Field_t>
 void advect( ExecutionSpace& exec_space, ProblemManagerType& pm, double delta_t,
-             [[maybe_unused]] const BoundaryCondition<NumSpaceDims>& bc, 
+             [[maybe_unused]] const BoundaryCondition<NumSpaceDims>& bc,
              Entity_t entity, Field_t field )
 {
     auto field_current = pm.get( entity, field, Version::Current() );
