@@ -105,7 +105,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
         // Create a problem manager to manage mesh state
         _pm = std::make_shared<ProblemManager<2, ExecutionSpace, MemorySpace>>(
-            ExecutionSpace(), _mesh, create_functor );
+            _mesh, create_functor );
 
         // Create a velocity corrector to enforce incompressibility
         _vc = createVelocityCorrector<2, ExecutionSpace, MemorySpace>(
@@ -241,12 +241,12 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
   private:
     /* Solver state variables */
-    double _dt;
-    double _density;
-    BodyForce<2> _body;
-    InflowSource<2> _source;
-    BoundaryCondition<2> _bc;
     int _halo_min;
+    double _density;
+    BoundaryCondition<2> _bc;
+    InflowSource<2> _source;
+    BodyForce<2> _body;
+    double _dt;
     std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
     std::shared_ptr<ProblemManager<2, ExecutionSpace, MemorySpace>> _pm;
     std::shared_ptr<VelocityCorrectorBase> _vc;

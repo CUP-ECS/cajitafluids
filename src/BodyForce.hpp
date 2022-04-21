@@ -31,9 +31,12 @@ template <>
 struct BodyForce<2>
 {
     template <class ArrayType>
-    KOKKOS_INLINE_FUNCTION void operator()( Cajita::Cell, ArrayType& d, int i,
-                                            int j, double x, double y,
-                                            double delta_t, double v ) const
+    KOKKOS_INLINE_FUNCTION void
+    operator()( Cajita::Cell, [[maybe_unused]] ArrayType& d,
+                [[maybe_unused]] int i, [[maybe_unused]] int j,
+                [[maybe_unused]] double x, [[maybe_unused]] double y,
+                [[maybe_unused]] double delta_t,
+                [[maybe_unused]] double v ) const
     {
     }
 
@@ -41,7 +44,8 @@ struct BodyForce<2>
     template <class ArrayType>
     KOKKOS_INLINE_FUNCTION void
     operator()( Cajita::Face<Cajita::Dim::I>, ArrayType& ux, int i, int j,
-                double x, double y, double delta_t, double v ) const
+                [[maybe_unused]] double x, [[maybe_unused]] double y,
+                double delta_t, [[maybe_unused]] double v ) const
     {
         ux( i, j, 0 ) += _force[0] * delta_t;
     }
@@ -49,7 +53,8 @@ struct BodyForce<2>
     template <class ArrayType>
     KOKKOS_INLINE_FUNCTION void
     operator()( Cajita::Face<Cajita::Dim::J>, ArrayType& uy, int i, int j,
-                double x, double y, double delta_t, double v ) const
+                [[maybe_unused]] double x, [[maybe_unused]] double y,
+                double delta_t, [[maybe_unused]] double v ) const
     {
         uy( i, j, 0 ) += _force[1] * delta_t;
     }

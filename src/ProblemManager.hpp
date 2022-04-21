@@ -125,8 +125,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     using mesh_type = Mesh<2, ExecutionSpace, MemorySpace>;
 
     template <class InitFunc>
-    ProblemManager( const ExecutionSpace& exec_space,
-                    const std::shared_ptr<mesh_type>& mesh,
+    ProblemManager( const std::shared_ptr<mesh_type>& mesh,
                     const InitFunc& create_functor )
         : _mesh( mesh )
     // , other initializers
