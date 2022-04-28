@@ -62,5 +62,8 @@ jobs:
       - name: Build and Deploy
         uses: docker/build-push-action@v2
         with:
+          context: .
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: ghcr.io/cup-ecs/cajitafluids-tester:latest
