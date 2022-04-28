@@ -6,11 +6,6 @@ on: [push, pull_request]
 #  pull_request:
 #    branches: [ develop, main ]
 
-# We have to run in a login shell to get the spack environment in the container set up
-#defaults:
-#  run:
-#    shell: /bin/bash -el {0}
-
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: RelWithDebInfo
@@ -24,9 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/cup-ecs/cajitafluids-nocuda:latest
-      #credentials:
-      #  username: ${{ github.actor }}
-      #  password: ${{ secrets.github_token }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
       env: 
         # When using spack on sighub runners, we have to customize the 
         # environment to pick up the needed spack view and modules
