@@ -73,6 +73,9 @@ add_subdirectory(src)
 # examples
 add_subdirectory(examples)
 
+# tests
+add_subdirectory(tests)
+
 # Add a target for formatting the code using Clang
 if(CLANG_FORMAT_FOUND)
   file(GLOB_RECURSE FORMAT_SOURCES src/*.cpp src/*.hpp examples/*.cpp examples/*.hpp)
