@@ -17,6 +17,9 @@ jobs:
     permissions:
       packages: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
       - name: Set Container Tag (push to develop)
         run: |
           container="cajitafluids-nocuda:latest"
