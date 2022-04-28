@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     container: 
       image: ghcr.io/spack/ubuntu-bionic:latest
-    permissions:
-      packages: write
-    credentials:
-      username: ${{ github.actor }}
-      password: ${{ secrets.github_token }}
+#    permissions:
+#      packages: write
+#    credentials:
+#      username: ${{ github.actor }}
+#      password: ${{ secrets.github_token }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
