@@ -12,8 +12,8 @@ on: [push, pull_request]
 jobs:
   deploy-docker-container:
     runs-on: ubuntu-latest
-    container: 
-      image: ghcr.io/spack/ubuntu-bionic:latest
+#    container: 
+#      image: ghcr.io/spack/ubuntu-bionic:latest
 #    permissions:
 #      packages: write
 #    credentials:
@@ -22,6 +22,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      - name: Checkout spack repo
+        uses: actions/checkout@v3
+        with:
+          repository: spack/spack
+          path: ./spack
 
       - name: Set Container Tag (push to develop)
         run: |
@@ -36,6 +42,7 @@ jobs:
 
       - name: Generate the Dockerfile
         run: |
+          . spack/share/spack/setup-env.sh
           cp configs/github/spack.yaml .
           spack containerize | tee Dockerfile
           printf "Preparing to build ${{ env.container }} from Dockerfile"
