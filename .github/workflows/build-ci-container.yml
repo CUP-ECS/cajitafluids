@@ -1,14 +1,13 @@
 name: ci
 
-on:
-  pull_request:
-    branches:
-      - 'develop'
-    paths:
-      - 'configs/github/spack.yaml'
-      - '.github/workflow/build-ci-container.yaml'
-    release:
-      types: [published]
+on: [push, pull_request]
+#    branches:
+#      - 'develop'
+#    paths:
+#      - 'configs/github/spack.yaml'
+#      - '.github/workflow/build-ci-container.yaml'
+#    release:
+#      types: [published]
 
 jobs:
   deploy-docker-container:
@@ -17,7 +16,7 @@ jobs:
       packages: write
     steps:
       # Steps taken from the Spack CI container build workflow
-      - name Checkout
+      - name: Checkout
         users: actions/checkout@v2
 
       - name: Set Container Tag (push to develop)
@@ -75,5 +74,5 @@ jobs:
         with:
           push: true
           tags: |
-	    ghcr.io/cup-ecs/${{ env.container }}
+            ghcr.io/cup-ecs/${{ env.container }}
             ghcr.io/cup-ecs/${{ env.versioned }}
