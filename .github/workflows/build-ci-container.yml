@@ -40,12 +40,12 @@ jobs:
               exit 1;
           fi
 
-#      - name: Upload Dockerfile
-#        uses: actions/upload-artifact@6673cd052c4cd6fcf4b4e6e60ea986c889389535
-#        with:
-#          name: Dockerfile
-#          path: Dockerfile
-#
+      - name: Upload Dockerfile
+        uses: actions/upload-artifact@6673cd052c4cd6fcf4b4e6e60ea986c889389535
+        with:
+          name: Dockerfile
+          path: Dockerfile
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
 
@@ -63,4 +63,4 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: true
-          tags: ghcr.io/cup-ecs/cajitafluids:latest
+          tags: ghcr.io/cup-ecs/cajitafluids-tester:latest
