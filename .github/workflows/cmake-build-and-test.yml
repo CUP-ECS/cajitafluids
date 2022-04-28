@@ -28,7 +28,8 @@ jobs:
       #  username: ${{ github.actor }}
       #  password: ${{ secrets.github_token }}
       env: 
-        # Customize the environemnt to pick up the needed spack view and modules
+        # When using spack on sighub runners, we have to customize the 
+        # environment to pick up the needed spack view and modules
         SPACK_ENV: "/opt/spack-environment"
         ACLOCAL_PATH: "/opt/view/share/aclocal"
         CMAKE_PREFIX_PATH: "/opt/view"
