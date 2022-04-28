@@ -1,19 +1,16 @@
 name: build-and-deploy-ci-container
 
-on: [push, pull_request]
-#    branches:
-#      - 'develop'
-#    paths:
-#      - 'configs/github/spack.yaml'
-#      - '.github/workflow/build-ci-container.yaml'
-#    release:
-#      types: [published]
+on: 
+  pull_request:
+    branches:
+      - 'develop'
+    paths:
+      - 'configs/github/spack.yaml'
+      - '.github/workflow/build-ci-container.yaml'
 
 jobs:
   deploy-docker-container:
     runs-on: ubuntu-latest
-#    container: 
-#      image: ghcr.io/spack/ubuntu-bionic:latest
 #    permissions:
 #      packages: write
 #    credentials:
