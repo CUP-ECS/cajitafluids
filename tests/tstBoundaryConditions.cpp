@@ -1,32 +1,38 @@
 #include "gtest/gtest.h"
 
 // Include Statements
-#include <BoundaryConditions.hpp>
-#include <Solver.hpp>
 
 #include <Cabana_Core.hpp>
 #include <Cajita.hpp>
 #include <Kokkos_Core.hpp>
 
-#include <mpi.h>
+#include <BoundaryConditions.hpp>
 
-#if DEBUG
-#include <iostream>
-#endif
+#include "tstProblemManager.hpp"
 
-
-class BoundaryConditionsTest : public ::testing::Test {
+template <class T> 
+class BoundaryConditionsTest : public ProblemManagerTest<T> {
  protected:
-  void SetUp() override {
+  void SetUp() {
+    ProblemManagerTest<T>::SetUp();
   }
 
-  void TearDown() override {
+  void TearDown() {
+    ProblemManagerTest<T>::TearDown();
   }
-
-  // The mesh and matrix the boundary conditions will be applied to.
 };
 
-TEST_F(BoundaryConditionsTest, MeshSolidEdge2D)
+using MeshDeviceTypes = ::testing::Types<
+#ifdef KOKKOS_ENABLE_OPENMP
+    DeviceType<Kokkos::OpenMP, Kokkos::HostSpace>,
+#endif
+#ifdef KOKKOS_ENABLE_CUDA
+    DeviceType<Kokkos::Cuda, Kokkos::CudaSpace>,
+#endif
+    DeviceType<Kokkos::Serial, Kokkos::HostSpace> >;
+
+TYPED_TEST_SUITE(BoundaryConditionsTest, MeshDeviceTypes);
+TYPED_TEST(BoundaryConditionsTest, MeshSolidEdge2D)
 {
    // The test fixture will have the mesh and matrix objects we're working 
    // with
@@ -41,7 +47,7 @@ TEST_F(BoundaryConditionsTest, MeshSolidEdge2D)
    // ASSERT_EQ(...);
 }
 
-TEST_F(BoundaryConditionsTest, MeshFreeEdge2D)
+TYPED_TEST(BoundaryConditionsTest, MeshFreeEdge2D)
 {
    // The test fixture will have the mesh and matrix objects we're working 
    // with
@@ -57,7 +63,7 @@ TEST_F(BoundaryConditionsTest, MeshFreeEdge2D)
    // EXPECT_TRUE(...);
 }
 
-TEST_F(BoundaryConditionsTest, MatrixSolidEdge2D)
+TYPED_TEST(BoundaryConditionsTest, MatrixSolidEdge2D)
 {
    // The test fixture will have the mesh and matrix objects we're working 
    // with
@@ -73,7 +79,7 @@ TEST_F(BoundaryConditionsTest, MatrixSolidEdge2D)
    // EXPECT_TRUE(...);
 }
 
-TEST_F(BoundaryConditionsTest, MatrixFreeEdge2D)
+TYPED_TEST(BoundaryConditionsTest, MatrixFreeEdge2D)
 {
    // The test fixture will have the mesh and matrix objects we're working 
    // with
@@ -87,4 +93,15 @@ TEST_F(BoundaryConditionsTest, MatrixFreeEdge2D)
 
    // Test 4 code here...
    // EXPECT_TRUE(...);
+}
+
+int main( int argc, char* argv[] )
+{
+    MPI_Init( &argc, &argv );
+    Kokkos::initialize( argc, argv );
+    ::testing::InitGoogleTest( &argc, argv );
+    int return_val = RUN_ALL_TESTS();
+    Kokkos::finalize();
+    MPI_Finalize();
+    return return_val;
 }
