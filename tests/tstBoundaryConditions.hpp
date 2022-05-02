@@ -1,3 +1,6 @@
+#ifndef _TST_BOUNDARYCONDITIONS_HPP_
+#define _TST_BOUNDARYCONDITIONS_HPP_
+
 #include "gtest/gtest.h"
 
 // Include Statements
@@ -9,6 +12,7 @@
 #include <BoundaryConditions.hpp>
 
 #include "tstProblemManager.hpp"
+#include "tstDriver.hpp"
 
 template <class T> 
 class BoundaryConditionsTest : public ProblemManagerTest<T> {
@@ -95,13 +99,4 @@ TYPED_TEST(BoundaryConditionsTest, MatrixFreeEdge2D)
    // EXPECT_TRUE(...);
 }
 
-int main( int argc, char* argv[] )
-{
-    MPI_Init( &argc, &argv );
-    Kokkos::initialize( argc, argv );
-    ::testing::InitGoogleTest( &argc, argv );
-    int return_val = RUN_ALL_TESTS();
-    Kokkos::finalize();
-    MPI_Finalize();
-    return return_val;
-}
+#endif // _TST_BOUNDARYCONDITIONS_HPP_

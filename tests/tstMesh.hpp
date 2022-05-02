@@ -1,5 +1,18 @@
 #ifndef _TSTMESH_HPP_
 #define _TSTMESH_HPP_
+
+#include "gtest/gtest.h"
+
+#include <Cabana_Core.hpp>
+#include <Cajita.hpp>
+#include <Kokkos_Core.hpp>
+
+#include <Mesh.hpp>
+
+#include <mpi.h>
+
+#include "tstDriver.hpp"
+
 /* 
  * Parameterizing on number of dimensions in here is messy and we 
  * don't do it yet. We'll sort that out when we move to 3D as well.
@@ -7,13 +20,6 @@
  * 1. http://www.ashermancinelli.com/gtest-type-val-param
  * 2. https://stackoverflow.com/questions/8507385/google-test-is-there-a-way-to-combine-a-test-which-is-both-type-parameterized-a
  */
-
-template <class E, class M> 
-struct DeviceType
-{
-  using ExecutionSpace = E;
-  using MemorySpace = M; 
-};
 
 template <class T> 
 class MeshTest : public ::testing::Test {
@@ -53,5 +59,22 @@ class MeshTest : public ::testing::Test {
 
     std::unique_ptr<mesh_type> testMesh_;
 };
+
+TYPED_TEST_SUITE( MeshTest, MeshDeviceTypes);
+
+TYPED_TEST(MeshTest, MeshParameters)
+{
+   // The test fixture will have the mesh and matrix objects we're working 
+   // with
+
+   // Set up the boundary condition object we're working with - solid edges
+
+   // Apply solid boundary conditions in the I, J, and, if appropriate, K
+   // directions
+
+   // Check that the velocity on each edge in the relevant directions are 0
+
+   // ASSERT_EQ(...);
+}
 
 #endif // _TSTMESH_HPP_
