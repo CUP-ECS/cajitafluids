@@ -26,9 +26,6 @@ class MeshTest : public ::testing::Test {
   // We need Cajita Arrays 
   // Convenience type declarations
   using Cell = Cajita::Cell;
-  using FaceI = Cajita::Face<Cajita::Dim::I>;
-  using FaceJ = Cajita::Face<Cajita::Dim::J>;
-  using FaceK = Cajita::Face<Cajita::Dim::K>;
 
   using cell_array =
         Cajita::Array<double, Cajita::Cell, Cajita::UniformMesh<double, 2>,
@@ -42,10 +39,13 @@ class MeshTest : public ::testing::Test {
   using mesh_type = CajitaFluids::Mesh<2, typename T::ExecutionSpace, typename T::MemorySpace>;
 
   protected:
+    const double boxWidth_ = 1.0;
+    const int boxCells_ = 512;
+
     void SetUp() override {
         // Allocate and initialize the Cajita mesh 
-        globalBoundingBox_ = { 0, 0, 1.0, 1.0 };
-        globalNumCells_ = {512, 512};
+        globalBoundingBox_ = { 0, 0, boxWidth_, boxWidth_ };
+        globalNumCells_ = {boxCells_, boxCells_};
 	testMesh_ = std::make_unique<mesh_type>( globalBoundingBox_, 
             globalNumCells_, partitioner_, 1, MPI_COMM_WORLD);
     }
@@ -64,17 +64,19 @@ TYPED_TEST_SUITE( MeshTest, MeshDeviceTypes);
 
 TYPED_TEST(MeshTest, MeshParameters)
 {
-   // The test fixture will have the mesh and matrix objects we're working 
-   // with
+   int r;
+   EXPECT_EQ(this->testMesh_->cellSize(), 
+             this->boxWidth_/this->boxCells_);
 
-   // Set up the boundary condition object we're working with - solid edges
+   auto mins = this->testMesh_->minDomainGlobalCellIndex();
+   EXPECT_EQ(mins[0], 0);
+   EXPECT_EQ(mins[1], 0);
+   auto maxs = this->testMesh_->maxDomainGlobalCellIndex();
+   EXPECT_EQ(maxs[0], this->boxCells_ - 1);
+   EXPECT_EQ(maxs[1], this->boxCells_ - 1);
 
-   // Apply solid boundary conditions in the I, J, and, if appropriate, K
-   // directions
-
-   // Check that the velocity on each edge in the relevant directions are 0
-
-   // ASSERT_EQ(...);
+   MPI_Comm_rank(MPI_COMM_WORLD, &r);
+   EXPECT_EQ(this->testMesh_->rank(), r);
 }
 
 #endif // _TSTMESH_HPP_
