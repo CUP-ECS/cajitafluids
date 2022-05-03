@@ -234,7 +234,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
                 l2g_facej( i, j, gi, gj );
                 source( FaceJ(), uj, i, j, x, y, delta_t, cell_area );
                 body( FaceJ(), uj, i, j, x, y, delta_t, cell_area );
-                bc( FaceI(), uj, gi, gj, i, j );
+                bc( FaceJ(), uj, gi, gj, i, j );
             } );
         Kokkos::Profiling::popRegion();
     }
