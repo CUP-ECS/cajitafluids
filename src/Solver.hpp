@@ -135,7 +135,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
         _vc->correctVelocity();
 
         // Now start advancing time.
-        do 
+        do
         {
             if ( 0 == _mesh->rank() && 0 == t % write_freq )
                 printf( "Step %d / %d at time = %f\n", t, num_step, time );
