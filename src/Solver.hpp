@@ -129,20 +129,26 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
         num_step = t_final / _dt;
 
-        while ( ( time < t_final ) )
+        // Finish set up of the initial state of the velocity field
+        // by adding input and applying hte pressure correction.
+        _addInputs();
+        _vc->correctVelocity();
+
+        // Now start advancing time.
+        do
         {
             if ( 0 == _mesh->rank() && 0 == t % write_freq )
                 printf( "Step %d / %d at time = %f\n", t, num_step, time );
 
-            // 1. Handle inflow and body forces.
-            _addInputs();
-
-            // 2. Adjust the velocity field to be divergence-free
-            _vc->correctVelocity();
-
-            // 3. Advect the quantities forward a time step in the
+            // 1. Advect the quantities forward a time step in the
             // computed velocity field
             TimeIntegrator::step<2>( ExecutionSpace(), *_pm, _dt, _bc );
+
+            // 2. Add any new inflows and body forces.
+            _addInputs();
+
+            // 3. Adjust the velocity field to be divergence-free
+            _vc->correctVelocity();
 
             // 4. Output mesh state periodically
             if ( 0 == t % write_freq )
@@ -151,7 +157,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             }
             time += _dt;
             t++;
-        }
+        } while ( ( time < t_final ) );
     }
 
     /* Internal methods for the solver */
