@@ -60,23 +60,4 @@ class MeshTest : public ::testing::Test {
     std::unique_ptr<mesh_type> testMesh_;
 };
 
-TYPED_TEST_SUITE( MeshTest, MeshDeviceTypes);
-
-TYPED_TEST(MeshTest, MeshParameters)
-{
-   int r;
-   EXPECT_EQ(this->testMesh_->cellSize(), 
-             this->boxWidth_/this->boxCells_);
-
-   auto mins = this->testMesh_->minDomainGlobalCellIndex();
-   EXPECT_EQ(mins[0], 0);
-   EXPECT_EQ(mins[1], 0);
-   auto maxs = this->testMesh_->maxDomainGlobalCellIndex();
-   EXPECT_EQ(maxs[0], this->boxCells_ - 1);
-   EXPECT_EQ(maxs[1], this->boxCells_ - 1);
-
-   MPI_Comm_rank(MPI_COMM_WORLD, &r);
-   EXPECT_EQ(this->testMesh_->rank(), r);
-}
-
 #endif // _TSTMESH_HPP_

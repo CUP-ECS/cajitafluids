@@ -122,7 +122,7 @@ struct BoundaryCondition<2>
         {
             v( i, j, 0 ) = 0;
         }
-        if ( ( gj >= max[1] ) && ( boundary_type[3] == BoundaryType::SOLID ) )
+        if ( ( gj > max[1] ) && ( boundary_type[3] == BoundaryType::SOLID ) )
         {
             v( i, j, 0 ) = 0;
         }

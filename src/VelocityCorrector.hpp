@@ -29,7 +29,11 @@
 
 namespace CajitaFluids
 {
-//---------------------------------------------------------------------------//
+/* 
+ * VelocityCorrector uses a virtual base class because the overall structure
+ * of the class depends on the underlying solver (hypre-based or reference)
+ * being used, and this abstracts that away for the classes that call this
+ */
 class VelocityCorrectorBase
 {
   public:

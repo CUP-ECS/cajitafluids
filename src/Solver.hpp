@@ -34,11 +34,16 @@
 
 namespace CajitaFluids
 {
-//---------------------------------------------------------------------------//
+/* 
+ * Convenience base class so that examples that use this don't need to know
+ * the details of the problem manager/mesh/etc templating. 
+ */
 class SolverBase
 {
   public:
     virtual ~SolverBase() = default;
+    virtual void setup( void ) = 0;
+    virtual void step( void ) = 0;
     virtual void solve( const double t_final, const int write_freq ) = 0;
 };
 
@@ -76,6 +81,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
         , _source( source )
         , _body( body )
         , _dt( delta_t )
+        , _time( 0.0 )
     {
 
         // Create a mesh one which to do the solve and a problem manager to
@@ -116,51 +122,64 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             std::make_shared<SiloWriter<2, ExecutionSpace, MemorySpace>>( _pm );
     }
 
-    void solve( const double t_final, const int write_freq ) override
+    
+    void setup() override
     {
-        int t = 0;
-        double time = 0.0;
-        int num_step;
-
-        Kokkos::Profiling::pushRegion( "Solve" );
-
-        _silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
-        Kokkos::Profiling::popRegion();
-
-        num_step = t_final / _dt;
+        // Should assert taht _time == 0 here.
 
         // Finish set up of the initial state of the velocity field
         // by adding input and applying hte pressure correction.
         _addInputs();
         _vc->correctVelocity();
+    }
+
+    void step( ) override
+    {
+        // 1. Advect the quantities forward a time step in the
+        // computed velocity field
+        TimeIntegrator::step<2>( ExecutionSpace(), *_pm, _dt, _bc );
+
+        // 2. Add any new inflows and body forces.
+        _addInputs();
+
+        // 3. Adjust the velocity field to be divergence-free
+        _vc->correctVelocity();
+        _time += _dt;
+    }
+
+    void solve( const double t_final, const int write_freq ) override
+    {
+        int t = 0;
+        int num_step;
+
+        Kokkos::Profiling::pushRegion( "Solve" );
+
+        _silo->siloWrite( strdup( "Mesh" ), t, _time, _dt );
+        Kokkos::Profiling::popRegion();
+
+        num_step = t_final / _dt;
+
+        setup();
 
         // Now start advancing time.
         do
         {
             if ( 0 == _mesh->rank() && 0 == t % write_freq )
-                printf( "Step %d / %d at time = %f\n", t, num_step, time );
+                printf( "Step %d / %d at time = %f\n", t, num_step, _time );
 
-            // 1. Advect the quantities forward a time step in the
-            // computed velocity field
-            TimeIntegrator::step<2>( ExecutionSpace(), *_pm, _dt, _bc );
-
-            // 2. Add any new inflows and body forces.
-            _addInputs();
-
-            // 3. Adjust the velocity field to be divergence-free
-            _vc->correctVelocity();
+            step();
 
             // 4. Output mesh state periodically
             if ( 0 == t % write_freq )
             {
-                _silo->siloWrite( strdup( "Mesh" ), t, time, _dt );
+                _silo->siloWrite( strdup( "Mesh" ), t, _time, _dt );
             }
-            time += _dt;
             t++;
-        } while ( ( time < t_final ) );
+        } while ( ( _time < t_final ) );
     }
 
-    /* Internal methods for the solver */
+    /* Internal methods for the solver - still technically public because Kokkos 
+     * requires them to be. */
     void _addInputs()
     {
         auto local_grid = *( _mesh->localGrid() );
@@ -253,6 +272,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
     InflowSource<2> _source;
     BodyForce<2> _body;
     double _dt;
+    double _time;
     std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
     std::shared_ptr<ProblemManager<2, ExecutionSpace, MemorySpace>> _pm;
     std::shared_ptr<VelocityCorrectorBase> _vc;
