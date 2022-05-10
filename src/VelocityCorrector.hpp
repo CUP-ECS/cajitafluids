@@ -29,7 +29,7 @@
 
 namespace CajitaFluids
 {
-/* 
+/*
  * VelocityCorrector uses a virtual base class because the overall structure
  * of the class depends on the underlying solver (hypre-based or reference)
  * being used, and this abstracts that away for the classes that call this
@@ -224,10 +224,10 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
         auto l2g = Cajita::IndexConversion::createL2G( *( _mesh->localGrid() ),
                                                        Cell() );
         auto local_grid = _mesh->localGrid();
-        auto iface_space = local_grid->indexSpace( Cajita::Own(), FaceI(),
-                                                  Cajita::Local() );
-        auto jface_space = local_grid->indexSpace( Cajita::Own(), FaceJ(),
-                                                  Cajita::Local() );
+        auto iface_space =
+            local_grid->indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
+        auto jface_space =
+            local_grid->indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
 
         /* Now apply the LHS to adjust the velocity field. We need to
          * halo the lhs (the computed pressure) to adjust edge velocities. */

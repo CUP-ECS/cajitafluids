@@ -34,9 +34,9 @@
 
 namespace CajitaFluids
 {
-/* 
+/*
  * Convenience base class so that examples that use this don't need to know
- * the details of the problem manager/mesh/etc templating. 
+ * the details of the problem manager/mesh/etc templating.
  */
 class SolverBase
 {
@@ -122,7 +122,6 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             std::make_shared<SiloWriter<2, ExecutionSpace, MemorySpace>>( _pm );
     }
 
-    
     void setup() override
     {
         // Should assert taht _time == 0 here.
@@ -133,7 +132,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
         _vc->correctVelocity();
     }
 
-    void step( ) override
+    void step() override
     {
         // 1. Advect the quantities forward a time step in the
         // computed velocity field
@@ -178,7 +177,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
         } while ( ( _time < t_final ) );
     }
 
-    /* Internal methods for the solver - still technically public because Kokkos 
+    /* Internal methods for the solver - still technically public because Kokkos
      * requires them to be. */
     void _addInputs()
     {
