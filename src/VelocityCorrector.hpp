@@ -65,8 +65,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
                                           MemorySpace>;
     using Cell = Cajita::Cell;
     using FaceI = Cajita::Face<Cajita::Dim::I>;
-
     using FaceJ = Cajita::Face<Cajita::Dim::J>;
+
     VelocityCorrector( const std::shared_ptr<pm_type>& pm, bc_type& bc,
                        const std::shared_ptr<SparseSolver>& pressure_solver,
                        double density, double delta_t )
@@ -224,14 +224,13 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
         auto l2g = Cajita::IndexConversion::createL2G( *( _mesh->localGrid() ),
                                                        Cell() );
         auto local_grid = _mesh->localGrid();
-        auto cell_space = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(),
+        auto iface_space = local_grid->indexSpace( Cajita::Own(), FaceI(),
+                                                  Cajita::Local() );
+        auto jface_space = local_grid->indexSpace( Cajita::Own(), FaceJ(),
                                                   Cajita::Local() );
 
         /* Now apply the LHS to adjust the velocity field. We need to
-         * halo the lhs here to adjut edge velocities. This halo is
-         * strictly larger than needed (only needs to be 1 deep and
-         * not include corners), but we reuse the exiting halo
-         * pattern for simplicity. */
+         * halo the lhs (the computed pressure) to adjust edge velocities. */
         Kokkos::Profiling::pushRegion(
             "VelocityCorrector::ApplyPressure:Gather" );
         _pressure_halo->gather( ExecutionSpace(), *_lhs );
@@ -240,16 +239,27 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
         const bc_type& bc = _bc;
 
         Kokkos::parallel_for(
-            "PressureVelocityCorrection",
-            createExecutionPolicy( cell_space, ExecutionSpace() ),
+            "PressureUVelocityCorrection",
+            createExecutionPolicy( iface_space, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
                 u( i, j, 0 ) -= scale * ( p( i, j, 0 ) - p( i - 1, j, 0 ) );
+
+                int gi, gj;
+                l2g( i, j, gi, gj );
+                bc( FaceI(), u, gi, gj, i, j );
+            } );
+
+        Kokkos::parallel_for(
+            "PressureVVelocityCorrection",
+            createExecutionPolicy( jface_space, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
                 v( i, j, 0 ) -= scale * ( p( i, j, 0 ) - p( i, j - 1, 0 ) );
 
                 int gi, gj;
                 l2g( i, j, gi, gj );
-                bc( Cell(), u, v, gi, gj, i, j );
+                bc( FaceJ(), u, gi, gj, i, j );
             } );
+
         Kokkos::Profiling::popRegion();
     }
 
