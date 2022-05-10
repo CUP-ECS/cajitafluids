@@ -40,17 +40,18 @@ class MeshTest : public ::testing::Test {
 
   protected:
     const double boxWidth_ = 1.0;
+    const int haloWidth_ = 3;
     const int boxCells_ = 512;
 
-    void SetUp() override {
+    virtual void SetUp() override {
         // Allocate and initialize the Cajita mesh 
         globalBoundingBox_ = { 0, 0, boxWidth_, boxWidth_ };
         globalNumCells_ = {boxCells_, boxCells_};
 	testMesh_ = std::make_unique<mesh_type>( globalBoundingBox_, 
-            globalNumCells_, partitioner_, 1, MPI_COMM_WORLD);
+            globalNumCells_, partitioner_, haloWidth_, MPI_COMM_WORLD);
     }
 
-    void TearDown() override {
+    virtual void TearDown() override {
     }
 
     Cajita::DimBlockPartitioner<2> partitioner_;
