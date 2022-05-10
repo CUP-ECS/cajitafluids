@@ -122,35 +122,9 @@ struct BoundaryCondition<2>
         {
             v( i, j, 0 ) = 0;
         }
-        if ( ( gj >= max[1] ) && ( boundary_type[3] == BoundaryType::SOLID ) )
+        if ( ( gj > max[1] ) && ( boundary_type[3] == BoundaryType::SOLID ) )
         {
             v( i, j, 0 ) = 0;
-        }
-    }
-
-    template <class UType, class VType>
-    KOKKOS_INLINE_FUNCTION void operator()( Cell, UType& u, VType& v,
-                                            const int gi, const int gj,
-                                            const int i, const int j ) const
-    {
-        // Force face velocity at cells on solid boundaries to be 0.
-        if ( ( gi <= min[0] ) && ( boundary_type[0] == BoundaryType::SOLID ) )
-        {
-            u( i, j, 0 ) = 0;
-        }
-        if ( ( gi >= max[0] - 1 ) &&
-             ( boundary_type[2] == BoundaryType::SOLID ) )
-        {
-            u( i + 1, j, 0 ) = 0;
-        }
-        if ( ( gj <= min[1] ) && ( boundary_type[1] == BoundaryType::SOLID ) )
-        {
-            v( i, j, 0 ) = 0;
-        }
-        if ( ( gj >= max[1] - 1 ) &&
-             ( boundary_type[3] == BoundaryType::SOLID ) )
-        {
-            v( i, j + 1, 0 ) = 0;
         }
     }
 
