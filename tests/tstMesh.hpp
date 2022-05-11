@@ -47,18 +47,19 @@ class MeshTest : public ::testing::Test {
         // Allocate and initialize the Cajita mesh 
         globalBoundingBox_ = { 0, 0, boxWidth_, boxWidth_ };
         globalNumCells_ = {boxCells_, boxCells_};
-	testMesh_ = std::make_unique<mesh_type>( globalBoundingBox_, 
+	testMesh_ = std::make_shared<mesh_type>( globalBoundingBox_, 
             globalNumCells_, partitioner_, haloWidth_, MPI_COMM_WORLD);
     }
 
     virtual void TearDown() override {
+        testMesh_ = NULL;
     }
 
     Cajita::DimBlockPartitioner<2> partitioner_;
     std::array<int, 2> globalNumCells_;
     Kokkos::Array<double, 4> globalBoundingBox_;
 
-    std::unique_ptr<mesh_type> testMesh_;
+    std::shared_ptr<mesh_type> testMesh_;
 };
 
 #endif // _TSTMESH_HPP_
