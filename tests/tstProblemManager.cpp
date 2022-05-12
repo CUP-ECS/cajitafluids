@@ -49,6 +49,7 @@ TYPED_TEST(ProblemManagerTest, StateArrayTest)
     // Check that we can swap the views properly by checking the cell view
     // (we don't check the other views for now)
     pm->advance(Cell(), Quantity());
+    auto qcurr = pm->get(Cell(), Quantity(), Current());
     auto qcopy = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
         qcurr);
     for (int i = qspace.min(0); i < qspace.max(0); i++) 
@@ -73,7 +74,7 @@ TYPED_TEST(ProblemManagerTest, HaloTest)
         });
 
     // Check that we can halo the views appropriately, using the FaceI direction
-    // as the checkj
+    // as the check
     pm->gather( Current() );
     std::array<int,2> directions[4] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
     auto ucopy = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), ucurr);
@@ -81,10 +82,10 @@ TYPED_TEST(ProblemManagerTest, HaloTest)
     {
         auto dir = directions[i];
         int neighbor_rank = mesh->localGrid()->neighborRank(dir);
-        auto u_boundary_space = mesh->localGrid()->boundaryIndexSpace(Cajita::Ghost(), 
+        auto u_shared_space = mesh->localGrid()->sharedIndexSpace(Cajita::Ghost(), 
             FaceI(), dir);
-        for (int i = u_boundary_space.min(0); i < u_boundary_space.max(0); i++) 
-            for (int j = u_boundary_space.min(1); j < u_boundary_space.max(1); j++)
+        for (int i = u_shared_space.min(0); i < u_shared_space.max(0); i++) 
+            for (int j = u_shared_space.min(1); j < u_shared_space.max(1); j++)
                 ASSERT_EQ(ucopy(i, j, 0), neighbor_rank * 1000 + i * 100 + j * 10 + 1);
     }
 }
