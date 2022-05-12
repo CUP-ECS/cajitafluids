@@ -53,7 +53,7 @@ TYPED_TEST(ProblemManagerTest, StateArrayTest)
         qcurr);
     for (int i = qspace.min(0); i < qspace.max(0); i++) 
         for (int j = qspace.min(1); j < qspace.max(1); j++) 
-            EXPECT_EQ(qcopy(i, j, 0), rank * 1000 + i * 100 + j + 10 + 5);
+            ASSERT_EQ(qcopy(i, j, 0), rank * 1000 + i * 100 + j * 10 + 5);
 }
 
 TYPED_TEST(ProblemManagerTest, HaloTest)
@@ -85,6 +85,6 @@ TYPED_TEST(ProblemManagerTest, HaloTest)
             FaceI(), dir);
         for (int i = u_boundary_space.min(0); i < u_boundary_space.max(0); i++) 
             for (int j = u_boundary_space.min(1); j < u_boundary_space.max(1); j++)
-                EXPECT_EQ(ucopy(i, j, 0), neighbor_rank * 1000 + i * 100 + j + 10);
+                ASSERT_EQ(ucopy(i, j, 0), neighbor_rank * 1000 + i * 100 + j + 10);
     }
 }
