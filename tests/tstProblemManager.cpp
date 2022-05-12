@@ -49,7 +49,7 @@ TYPED_TEST(ProblemManagerTest, StateArrayTest)
     // Check that we can swap the views properly by checking the cell view
     // (we don't check the other views for now)
     pm->advance(Cell(), Quantity());
-    auto qcurr = pm->get(Cell(), Quantity(), Current());
+    qcurr = pm->get(Cell(), Quantity(), Current());
     auto qcopy = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
         qcurr);
     for (int i = qspace.min(0); i < qspace.max(0); i++) 
