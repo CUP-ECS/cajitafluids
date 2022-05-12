@@ -85,6 +85,6 @@ TYPED_TEST(ProblemManagerTest, HaloTest)
             FaceI(), dir);
         for (int i = u_boundary_space.min(0); i < u_boundary_space.max(0); i++) 
             for (int j = u_boundary_space.min(1); j < u_boundary_space.max(1); j++)
-                ASSERT_EQ(ucopy(i, j, 0), neighbor_rank * 1000 + i * 100 + j + 10);
+                ASSERT_EQ(ucopy(i, j, 0), neighbor_rank * 1000 + i * 100 + j * 10 + 1);
     }
 }
