@@ -28,11 +28,7 @@ TYPED_TEST(ProblemManagerTest, StateArrayTest)
     auto pm = this->testPM_;
     auto mesh = pm->mesh();
     auto qcurr = pm->get(Cell(), Quantity(), Current());
-    auto ucurr = pm->get(FaceI(), Velocity(), Current());
-    auto vcurr = pm->get(FaceJ(), Velocity(), Current());
     auto qnext = pm->get(Cell(), Quantity(), Next());
-    auto unext = pm->get(FaceI(), Velocity(), Next());
-    auto vnext = pm->get(FaceJ(), Velocity(), Next());
     auto rank = mesh->rank();
 
     /* Set values in the array based on our rank. Each cell gets a value of 
@@ -41,38 +37,54 @@ TYPED_TEST(ProblemManagerTest, StateArrayTest)
      * FaceJ: +2
      * Next(): +5
      */
-    auto cell_space = mesh->localGrid()->indexSpace(Cajita::Own(), Cell(), Cajita ::Local());
-    auto u_space = mesh->localGrid()->indexSpace(Cajita::Own(), FaceI(), Cajita ::Local());
-    auto v_space = mesh->localGrid()->indexSpace(Cajita::Own(), FaceJ(), Cajita ::Local());
+    auto qspace = mesh->localGrid()->indexSpace(Cajita::Own(), Cell(), Cajita ::Local());
     Kokkos::parallel_for(
         "InitializeCellFields", 
-        createExecutionPolicy(cell_space, ExecutionSpace() ),
+        createExecutionPolicy(qspace, ExecutionSpace() ),
         KOKKOS_LAMBDA( const int i, const int j ) {
             qcurr(i, j, 0) = rank * 1000 + i * 100 + j * 10;
             qnext(i, j, 0) = rank * 1000 + i * 100 + j * 10 + 5;
         });
-    Kokkos::parallel_for(
-        "InitializeFaceIFields", 
-        createExecutionPolicy(v_space, ExecutionSpace() ),
-        KOKKOS_LAMBDA( const int i, const int j ) {
-            ucurr(i, j, 0) = rank * 1000 + i * 100 + j * 10 + 1;
-            unext(i, j, 0) = rank * 1000 + i * 100 + j * 10 + 5 + 1;
-        });
-    Kokkos::parallel_for(
-        "InitializeFaceJFields", 
-        createExecutionPolicy(u_space, ExecutionSpace() ),
-        KOKKOS_LAMBDA( const int i, const int j ) {
-            vcurr(i, j, 0) = rank * 1000 + i * 100 + j * 10 + 2;
-            vnext(i, j, 0) = rank * 1000 + i * 100 + j * 10 + 5 + 2;
-        });
 
-   // Check that we can swap the views properly
-
-   // Check that we can halo the views appropriately
-
-   // ASSERT_EQ(...);
+    // Check that we can swap the views properly by checking the cell view
+    // (we don't check the other views for now)
+    pm->advance(Cell(), Quantity());
+    auto qcopy = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), 
+        qcurr);
+    for (int i = qspace.min(0); i < qspace.max(0); i++) 
+        for (int j = qspace.min(1); j < qspace.max(1); j++) 
+            EXPECT_EQ(qcopy(i, j, 0), rank * 1000 + i * 100 + j + 10 + 5);
 }
 
 TYPED_TEST(ProblemManagerTest, HaloTest)
 {
+    using ExecutionSpace = typename TestFixture::ExecutionSpace;
+
+    auto pm = this->testPM_;
+    auto mesh = pm->mesh();
+    auto rank = mesh->rank();
+    auto ucurr = pm->get(FaceI(), Velocity(), Current());
+    auto uspace = mesh->localGrid()->indexSpace(Cajita::Own(), FaceI(), Cajita ::Local());
+    Kokkos::parallel_for(
+        "InitializeFaceIFields", 
+        createExecutionPolicy(uspace, ExecutionSpace() ),
+        KOKKOS_LAMBDA( const int i, const int j ) {
+            ucurr(i, j, 0) = rank * 1000 + i * 100 + j * 10 + 1;
+        });
+
+    // Check that we can halo the views appropriately, using the FaceI direction
+    // as the checkj
+    pm->gather( Current() );
+    std::array<int,2> directions[4] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    auto ucopy = Kokkos::create_mirror_view_and_copy( Kokkos::HostSpace(), ucurr);
+    for (int i = 0; i < 4; i++) 
+    {
+        auto dir = directions[i];
+        int neighbor_rank = mesh->localGrid()->neighborRank(dir);
+        auto u_boundary_space = mesh->localGrid()->boundaryIndexSpace(Cajita::Ghost(), 
+            FaceI(), dir);
+        for (int i = u_boundary_space.min(0); i < u_boundary_space.max(0); i++) 
+            for (int j = u_boundary_space.min(1); j < u_boundary_space.max(1); j++)
+                EXPECT_EQ(ucopy(i, j, 0), neighbor_rank * 1000 + i * 100 + j + 10);
+    }
 }
