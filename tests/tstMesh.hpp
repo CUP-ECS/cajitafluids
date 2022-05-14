@@ -13,47 +13,50 @@
 
 #include "tstDriver.hpp"
 
-/* 
- * Parameterizing on number of dimensions in here is messy and we 
+/*
+ * Parameterizing on number of dimensions in here is messy and we
  * don't do it yet. We'll sort that out when we move to 3D as well.
- * These webpage has some ideas on how to I haven't yet deciphered: 
+ * These webpage has some ideas on how to I haven't yet deciphered:
  * 1. http://www.ashermancinelli.com/gtest-type-val-param
- * 2. https://stackoverflow.com/questions/8507385/google-test-is-there-a-way-to-combine-a-test-which-is-both-type-parameterized-a
+ * 2.
+ * https://stackoverflow.com/questions/8507385/google-test-is-there-a-way-to-combine-a-test-which-is-both-type-parameterized-a
  */
 
-template <class T> 
-class MeshTest : public ::testing::Test {
-  // We need Cajita Arrays 
-  // Convenience type declarations
-  using Cell = Cajita::Cell;
+template <class T>
+class MeshTest : public ::testing::Test
+{
+    // We need Cajita Arrays
+    // Convenience type declarations
+    using Cell = Cajita::Cell;
 
-  using cell_array =
+    using cell_array =
         Cajita::Array<double, Cajita::Cell, Cajita::UniformMesh<double, 2>,
                       typename T::MemorySpace>;
-  using iface_array =
+    using iface_array =
         Cajita::Array<double, Cajita::Face<Cajita::Dim::I>,
                       Cajita::UniformMesh<double, 2>, typename T::MemorySpace>;
-  using jface_array =
+    using jface_array =
         Cajita::Array<double, Cajita::Face<Cajita::Dim::J>,
                       Cajita::UniformMesh<double, 2>, typename T::MemorySpace>;
-  using mesh_type = CajitaFluids::Mesh<2, typename T::ExecutionSpace, typename T::MemorySpace>;
+    using mesh_type = CajitaFluids::Mesh<2, typename T::ExecutionSpace,
+                                         typename T::MemorySpace>;
 
   protected:
     const double boxWidth_ = 1.0;
     const int haloWidth_ = 3;
     const int boxCells_ = 512;
 
-    virtual void SetUp() override {
-        // Allocate and initialize the Cajita mesh 
+    virtual void SetUp() override
+    {
+        // Allocate and initialize the Cajita mesh
         globalBoundingBox_ = { 0, 0, boxWidth_, boxWidth_ };
-        globalNumCells_ = {boxCells_, boxCells_};
-	testMesh_ = std::make_shared<mesh_type>( globalBoundingBox_, 
-            globalNumCells_, partitioner_, haloWidth_, MPI_COMM_WORLD);
+        globalNumCells_ = { boxCells_, boxCells_ };
+        testMesh_ = std::make_shared<mesh_type>( globalBoundingBox_,
+                                                 globalNumCells_, partitioner_,
+                                                 haloWidth_, MPI_COMM_WORLD );
     }
 
-    virtual void TearDown() override {
-        testMesh_ = NULL;
-    }
+    virtual void TearDown() override { testMesh_ = NULL; }
 
     Cajita::DimBlockPartitioner<2> partitioner_;
     std::array<int, 2> globalNumCells_;
