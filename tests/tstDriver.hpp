@@ -8,8 +8,8 @@
 template <class E, class M>
 struct DeviceType
 {
-  using ExecutionSpace = E;
-  using MemorySpace = M;
+    using ExecutionSpace = E;
+    using MemorySpace = M;
 };
 
 using MeshDeviceTypes = ::testing::Types<
@@ -19,7 +19,7 @@ using MeshDeviceTypes = ::testing::Types<
 #ifdef KOKKOS_ENABLE_CUDA
     DeviceType<Kokkos::Cuda, Kokkos::CudaSpace>,
 #endif
-    DeviceType<Kokkos::Serial, Kokkos::HostSpace> >;
+    DeviceType<Kokkos::Serial, Kokkos::HostSpace>>;
 
 int main( int argc, char* argv[] )
 {

@@ -11,19 +11,16 @@
 
 #include <BoundaryConditions.hpp>
 
-#include "tstProblemManager.hpp"
 #include "tstDriver.hpp"
+#include "tstProblemManager.hpp"
 
-template <class T> 
-class BoundaryConditionsTest : public ProblemManagerTest<T> {
- protected:
-  void SetUp() {
-    ProblemManagerTest<T>::SetUp();
-  }
+template <class T>
+class BoundaryConditionsTest : public ProblemManagerTest<T>
+{
+  protected:
+    void SetUp() { ProblemManagerTest<T>::SetUp(); }
 
-  void TearDown() {
-    ProblemManagerTest<T>::TearDown();
-  }
+    void TearDown() { ProblemManagerTest<T>::TearDown(); }
 };
 
 #endif // _TST_BOUNDARYCONDITIONS_HPP_
