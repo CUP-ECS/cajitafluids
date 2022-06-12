@@ -17,7 +17,7 @@ The main elements of the benchmark are:
     MPI approaches for the halo exchange are explored.
   * Interpolation (either cubic splines or linear) for semi-Lagrangian 
     advection of the material being advected across timesteps.
-  * Either forward euler or 3rd-order Runge Kutta for time integration
+  * 3rd-order Runge Kutta for time integration
 
 Sources:
   - Fluid Simulation for Comptuer Graphics by Bridson

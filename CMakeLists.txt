@@ -8,8 +8,26 @@ include(GNUInstallDirs)
 # find dependencies
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
-# Use BLT to help with building, linking, and testing on various HPC
-# systems
+# We use LLNL BLT to help with building, linking, and testing on various HPC systems.
+# Before bringing in BLT, we set a variety of flags whch tell it the featurs we're
+# interested in.
+# Build options
+set(ENABLE_MPI ON CACHE BOOL "Build MPI support")
+set(ENABLE_CLANG_CUDA "Use Clang's native CUDA support" ON)
+
+# Build options for libraries, disable extras
+set(ENABLE_TESTS "Build tests" On)
+
+if (ENABLE_CUDA)
+  # Separable compilation is required by comb, set before load BLT
+  set(CUDA_SEPARABLE_COMPILATION ON CACHE BOOL "")
+  if (NOT DEFINED CUDA_ARCH)
+    message(STATUS "CUDA compute architecture set to Comb default sm_35 since it was not specified")
+    set(CUDA_ARCH "sm_35" CACHE STRING "Set CUDA_ARCH to Comb minimum supported" FORCE)
+  endif()
+endif()
+
+# Now that everyting is set up, bring in BLT
 if (DEFINED BLT_SOURCE_DIR)
     # Support having a shared BLT outside of the repository if given a BLT_SOURCE_DIR
     if (NOT EXISTS ${BLT_SOURCE_DIR}/SetupBLT.cmake)
@@ -28,9 +46,9 @@ else()
     endif()
 endif()
 
-# Default to C++11 if not set so GTest/GMock can build
+# Default to C++17 so we can use if constexpr and [[maybe_unused]]
 if (NOT BLT_CXX_STD)
-    set(BLT_CXX_STD "c++11" CACHE STRING "")
+    set(BLT_CXX_STD "c++17" CACHE STRING "")
 endif()
 
 include(${BLT_SOURCE_DIR}/SetupBLT.cmake)
@@ -52,13 +70,15 @@ find_package(CLANG_FORMAT 10)
 # library
 add_subdirectory(src)
 
-
 # examples
 add_subdirectory(examples)
 
+# tests
+add_subdirectory(tests)
+
 # Add a target for formatting the code using Clang
 if(CLANG_FORMAT_FOUND)
-  file(GLOB_RECURSE FORMAT_SOURCES src/*.cpp src/*.hpp examples/*.cpp examples/*.hpp)
+  file(GLOB_RECURSE FORMAT_SOURCES src/*.cpp src/*.hpp tests/*.hpp tests/*.cpp examples/*.cpp examples/*.hpp)
   add_custom_target(format
     COMMAND ${CLANG_FORMAT_EXECUTABLE} -i -style=file ${FORMAT_SOURCES}
     DEPENDS ${FORMAT_SOURCES})

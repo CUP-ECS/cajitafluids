@@ -1,5 +1,5 @@
 set(HEADERS
-  BodySource.hpp
+  BodyForce.hpp
   BoundaryConditions.hpp
   InflowSource.hpp
   Interpolation.hpp
@@ -15,22 +15,21 @@ set(SOURCES
   Mesh.cpp
   )
 
-add_library(cajitafluids ${SOURCES})
-
-# We use C++ 17 features (if constexpr)
-target_compile_features(cajitafluids PUBLIC cxx_std_17)
-
-target_link_libraries(cajitafluids
+set(DEPENDS_ON
   Cabana::cabanacore
   Cabana::Cajita
-  Silo::silo )
-
-# Add HYPRE:HYPRE to the above if needed for a cabana-local build
-
-target_include_directories(cajitafluids
-  PUBLIC
+  Silo::silo 
+  mpi
+  )
+ 
+set(INCLUDES
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
   )
-
-install(TARGETS cajitafluids LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+       
+blt_add_library( NAME cajitafluids
+                 HEADERS ${HEADERS}
+                 SOURCES ${SOURCES}
+                 INCLUDES ${INCLUDES}
+                 DEPENDS_ON ${DEPENDS_ON} 
+  )

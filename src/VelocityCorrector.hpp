@@ -29,7 +29,11 @@
 
 namespace CajitaFluids
 {
-//---------------------------------------------------------------------------//
+/*
+ * VelocityCorrector uses a virtual base class because the overall structure
+ * of the class depends on the underlying solver (hypre-based or reference)
+ * being used, and this abstracts that away for the classes that call this
+ */
 class VelocityCorrectorBase
 {
   public:
@@ -61,8 +65,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
                                           MemorySpace>;
     using Cell = Cajita::Cell;
     using FaceI = Cajita::Face<Cajita::Dim::I>;
-
     using FaceJ = Cajita::Face<Cajita::Dim::J>;
+
     VelocityCorrector( const std::shared_ptr<pm_type>& pm, bc_type& bc,
                        const std::shared_ptr<SparseSolver>& pressure_solver,
                        double density, double delta_t )
@@ -166,7 +170,6 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
         auto owned_space =
             local_grid->indexSpace( Cajita::Own(), Cell(), Cajita::Local() );
         auto preconditioner_view = preconditioner_entries.view();
-        auto scale = _dt / ( _density * _mesh->cellSize() * _mesh->cellSize() );
 
         Kokkos::parallel_for(
             "fill_preconditioner_entries",
@@ -174,65 +177,6 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
             KOKKOS_LAMBDA( const int i, const int j ) {
                 preconditioner_view( i, j, 0 ) = 1.0 / m( i, j, 0 );
             } );
-    }
-
-    template <class View_t>
-    void printMatrixEntries( View_t entry_view )
-    {
-        auto local_grid = ( _mesh->localGrid() );
-        std::vector<std::array<int, 2>> stencil = {
-            { 0, 0 }, { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
-
-        // Build the solver matrix - set the default entry for each cell
-        // then apply the boundary conditions to it
-        auto owned_space =
-            local_grid->indexSpace( Cajita::Own(), Cell(), Cajita::Local() );
-
-        auto entry_view_host = Kokkos::create_mirror_view_and_copy(
-            Kokkos::HostSpace(), entry_view );
-        std::cout << "Matrix Rows:\n";
-        std::cout << std::fixed;
-        std::cout << std::showpoint;
-        std::cout << std::setprecision( 1 );
-        for ( int i = 0; i < owned_space.extent( 0 ); i++ )
-        {
-            for ( int j = 0; j < owned_space.extent( 1 ); j++ )
-            {
-                std::cout << "(" << i << "," << j << "): ";
-                for ( int k = 0; k < owned_space.size(); k++ )
-                {
-                    int found = 0;
-                    for ( int s = 0; s < stencil.size(); s++ )
-                    {
-                        int iidx = i + owned_space.min( 0 );
-                        int jidx = j + owned_space.min( 1 );
-                        int otheri = i + stencil[s][0],
-                            otherj = j + stencil[s][1];
-                        if ( ( otheri < 0 ) || ( otherj < 0 ) ||
-                             ( otheri >= owned_space.extent( 0 ) ) ||
-                             ( otherj >= owned_space.extent( 1 ) ) )
-                        {
-                            assert( entry_view_host( iidx, jidx, s ) == 0 );
-                            continue;
-                        }
-                        int otheridx =
-                            otheri * owned_space.extent( 0 ) + otherj;
-                        if ( k == otheridx )
-                        {
-                            int otheriidx = otheri + owned_space.min( 0 );
-                            int otherjidx = otherj + owned_space.min( 1 );
-                            std::cout << std::right << std::setw( 5 )
-                                      << entry_view_host( iidx, jidx, s )
-                                      << " ";
-                            found = 1;
-                        }
-                    }
-                    if ( !found )
-                        std::cout << std::right << std::setw( 5 ) << 0.0 << " ";
-                }
-                std::cout << "\n";
-            }
-        }
     }
 
     void _buildRHS()
@@ -280,14 +224,13 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
         auto l2g = Cajita::IndexConversion::createL2G( *( _mesh->localGrid() ),
                                                        Cell() );
         auto local_grid = _mesh->localGrid();
-        auto cell_space = local_grid->indexSpace( Cajita::Own(), Cajita::Cell(),
-                                                  Cajita::Local() );
+        auto iface_space =
+            local_grid->indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
+        auto jface_space =
+            local_grid->indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
 
         /* Now apply the LHS to adjust the velocity field. We need to
-         * halo the lhs here to adjut edge velocities. This halo is
-         * strictly larger than needed (only needs to be 1 deep and
-         * not include corners), but we reuse the exiting halo
-         * pattern for simplicity. */
+         * halo the lhs (the computed pressure) to adjust edge velocities. */
         Kokkos::Profiling::pushRegion(
             "VelocityCorrector::ApplyPressure:Gather" );
         _pressure_halo->gather( ExecutionSpace(), *_lhs );
@@ -296,16 +239,27 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
         const bc_type& bc = _bc;
 
         Kokkos::parallel_for(
-            "PressureVelocityCorrection",
-            createExecutionPolicy( cell_space, ExecutionSpace() ),
+            "PressureUVelocityCorrection",
+            createExecutionPolicy( iface_space, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
                 u( i, j, 0 ) -= scale * ( p( i, j, 0 ) - p( i - 1, j, 0 ) );
+
+                int gi, gj;
+                l2g( i, j, gi, gj );
+                bc( FaceI(), u, gi, gj, i, j );
+            } );
+
+        Kokkos::parallel_for(
+            "PressureVVelocityCorrection",
+            createExecutionPolicy( jface_space, ExecutionSpace() ),
+            KOKKOS_LAMBDA( const int i, const int j ) {
                 v( i, j, 0 ) -= scale * ( p( i, j, 0 ) - p( i, j - 1, 0 ) );
 
                 int gi, gj;
                 l2g( i, j, gi, gj );
-                bc( Cell(), u, v, gi, gj, i, j );
+                bc( FaceJ(), u, gi, gj, i, j );
             } );
+
         Kokkos::Profiling::popRegion();
     }
 
@@ -328,16 +282,16 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
     }
 
   private:
-    std::shared_ptr<cell_array> _lhs;
-    std::shared_ptr<cell_array> _rhs;
-    BoundaryCondition<2> _bc;
     std::shared_ptr<pm_type> _pm;
+    BoundaryCondition<2> _bc;
+    double _density;
+    double _dt;
     std::shared_ptr<Mesh<2, ExecutionSpace, MemorySpace>> _mesh;
     std::shared_ptr<SparseSolver> _pressure_solver;
     std::shared_ptr<Cajita::Halo<MemorySpace>> _pressure_halo;
 
-    double _dt;
-    double _density;
+    std::shared_ptr<cell_array> _lhs;
+    std::shared_ptr<cell_array> _rhs;
 };
 
 template <std::size_t NumSpaceDims, class ExecutionSpace, class MemorySpace,
