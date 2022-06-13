@@ -361,7 +361,7 @@ class SiloWriter
         DBfile* master_file;
         int size;
         int driver = DB_PDB;
-        const char* file_ext = "pdb";
+        const char* file_ext = "silo";
         // TODO: Make the Number of Groups a Constant or a Runtime Parameter (
         // Between 8 and 64 )
         int numGroups = 2;
@@ -401,7 +401,7 @@ class SiloWriter
         {
             master_file = DBCreate( masterfilename, DB_CLOBBER, DB_LOCAL,
                                     "CajitaFluids", driver );
-            writeMultiObjects( master_file, baton, size, time_step, "pdb" );
+            writeMultiObjects( master_file, baton, size, time_step, "silo" );
             DBClose( master_file );
         }
         Kokkos::Profiling::popRegion();

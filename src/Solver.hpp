@@ -154,10 +154,8 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
         Kokkos::Profiling::pushRegion( "Solve" );
 
         _silo->siloWrite( strdup( "Mesh" ), t, _time, _dt );
-        Kokkos::Profiling::popRegion();
 
         num_step = t_final / _dt;
-
         setup();
 
         // Now start advancing time.
@@ -175,6 +173,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
             }
             t++;
         } while ( ( _time < t_final ) );
+        Kokkos::Profiling::popRegion();
     }
 
     /* Internal methods for the solver - still technically public because Kokkos
