@@ -7,21 +7,21 @@
  * Silo Writer class to write results to a silo file using PMPIO
  */
 
-#ifndef CAJITAFLUIDS_SILOWRITER_HPP
-#define CAJITAFLUIDS_SILOWRITER_HPP
+#ifndef CABANAFLUIDS_SILOWRITER_HPP
+#define CABANAFLUIDS_SILOWRITER_HPP
 
 #ifndef DEBUG
 #define DEBUG 0
 #endif
 
 // Include Statements
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 #include <Interpolation.hpp>
 
 #include <pmpio.h>
 #include <silo.h>
 
-namespace CajitaFluids
+namespace CabanaFluids
 {
 
 /**
@@ -46,7 +46,7 @@ class SiloWriter
         : _pm( pm )
     {
         if ( DEBUG && _pm->mesh()->rank() == 0 )
-            std::cerr << "Created CajitaFluids SiloWriter\n";
+            std::cerr << "Created CabanaFluids SiloWriter\n";
     };
 
     /**
@@ -90,7 +90,7 @@ class SiloWriter
         // coordinates of the portion of the mesh we're writing
         Kokkos::Profiling::pushRegion( "SiloWriter::WriteFile::WriteMesh" );
         auto cell_domain = local_grid->indexSpace(
-            Cajita::Own(), Cajita::Cell(), Cajita::Local() );
+            Cabana::Grid::Own(), Cabana::Grid::Cell(), Cabana::Grid::Local() );
 
         for ( unsigned int i = 0; i < Dims; i++ )
         {
@@ -117,7 +117,7 @@ class SiloWriter
                 for ( unsigned int j = 0; j < Dims; j++ )
                     index[j] = 0;
                 index[d] = i;
-                local_mesh.coordinates( Cajita::Node(), index, location );
+                local_mesh.coordinates( Cabana::Grid::Node(), index, location );
                 coords[d][iown] = location[d];
             }
         }
@@ -134,7 +134,7 @@ class SiloWriter
         // execution space to the host execution space
         Kokkos::Profiling::pushRegion( "SiloWriter::WriteFile::WriteQuantity" );
         auto q =
-            _pm->get( Cajita::Cell(), Field::Quantity(), Version::Current() );
+            _pm->get( Cabana::Grid::Cell(), Field::Quantity(), Version::Current() );
         auto xmin = cell_domain.min( 0 );
         auto ymin = cell_domain.min( 1 );
 
@@ -160,9 +160,9 @@ class SiloWriter
         Kokkos::Profiling::popRegion();
 
         Kokkos::Profiling::pushRegion( "SiloWriter::WriteFile::WriteVelocity" );
-        auto u = _pm->get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(),
+        auto u = _pm->get( Cabana::Grid::Face<Cabana::Grid::Dim::I>(), Field::Velocity(),
                            Version::Current() );
-        auto v = _pm->get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(),
+        auto v = _pm->get( Cabana::Grid::Face<Cabana::Grid::Dim::J>(), Field::Velocity(),
                            Version::Current() );
 
         /* Because VisIt and all the other things that read Silo files
@@ -185,7 +185,7 @@ class SiloWriter
             KOKKOS_LAMBDA( const int i, const int j ) {
                 int idx[2] = { i, j };
                 double loc[2], velocity[2];
-                local_mesh.coordinates( Cajita::Cell(), idx, loc );
+                local_mesh.coordinates( Cabana::Grid::Cell(), idx, loc );
                 Interpolation::interpolateVelocity<2, 1>( loc, local_mesh, u, v,
                                                           velocity );
                 uOwned( i - xmin, j - ymin, 0 ) = velocity[0];
@@ -227,7 +227,7 @@ class SiloWriter
         Kokkos::Profiling::pushRegion( "SiloWriter::CreateSiloFile" );
 
         DBfile* silo_file = DBCreate( filename, DB_CLOBBER, DB_LOCAL,
-                                      "CajitaFluidsRaw", driver );
+                                      "CabanaFluidsRaw", driver );
 
         if ( silo_file )
         {
@@ -313,13 +313,13 @@ class SiloWriter
             v_block_names[i] = (char*)malloc( 1024 );
 
             sprintf( mesh_block_names[i],
-                     "raw/CajitaFluidsOutput%05d%05d.%s:/domain_%05d/Mesh",
+                     "raw/CabanaFluidsOutput%05d%05d.%s:/domain_%05d/Mesh",
                      group_rank, time_step, file_ext, i );
             sprintf( q_block_names[i],
-                     "raw/CajitaFluidsOutput%05d%05d.%s:/domain_%05d/quantity",
+                     "raw/CabanaFluidsOutput%05d%05d.%s:/domain_%05d/quantity",
                      group_rank, time_step, file_ext, i );
             sprintf( v_block_names[i],
-                     "raw/CajitaFluidsOutput%05d%05d.%s:/domain_%05d/velocity",
+                     "raw/CabanaFluidsOutput%05d%05d.%s:/domain_%05d/velocity",
                      group_rank, time_step, file_ext, i );
             block_types[i] = DB_QUADMESH;
             var_types[i] = DB_QUADVAR;
@@ -380,9 +380,9 @@ class SiloWriter
                         createSiloFile, openSiloFile, closeSiloFile, &driver );
 
         // Set Filename to Reflect TimeStep
-        sprintf( masterfilename, "data/CajitaFluids%05d.%s", time_step,
+        sprintf( masterfilename, "data/CabanaFluids%05d.%s", time_step,
                  file_ext );
-        sprintf( filename, "data/raw/CajitaFluidsOutput%05d%05d.%s",
+        sprintf( filename, "data/raw/CabanaFluidsOutput%05d%05d.%s",
                  PMPIO_GroupRank( baton, _pm->mesh()->rank() ), time_step,
                  file_ext );
         sprintf( nsname, "domain_%05d", _pm->mesh()->rank() );
@@ -400,7 +400,7 @@ class SiloWriter
         if ( _pm->mesh()->rank() == 0 )
         {
             master_file = DBCreate( masterfilename, DB_CLOBBER, DB_LOCAL,
-                                    "CajitaFluids", driver );
+                                    "CabanaFluids", driver );
             writeMultiObjects( master_file, baton, size, time_step, "pdb" );
             DBClose( master_file );
         }
@@ -421,5 +421,5 @@ class SiloWriter
     std::shared_ptr<pm_type> _pm;
 };
 
-}; // namespace CajitaFluids
+}; // namespace CabanaFluids
 #endif

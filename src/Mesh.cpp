@@ -1,8 +1,8 @@
 /****************************************************************************
- * Copyright (c) 2021 by the CajitaFluids authors                           *
+ * Copyright (c) 2021 by the CabanaFluids authors                           *
  * All rights reserved.                                                     *
  *                                                                          *
- * This file is part of the CajitaFluids benchmark. CajitaFluids is         *
+ * This file is part of the CabanaFluids benchmark. CabanaFluids is         *
  * distributed under a BSD 3-clause license. For the licensing terms see    *
  * the LICENSE file in the top-level directory.                             *
  *                                                                          *
@@ -11,7 +11,7 @@
 
 #include <Mesh.hpp>
 
-namespace CajitaFluids
+namespace CabanaFluids
 {
 //---------------------------------------------------------------------------//
 #ifdef KOKKOS_ENABLE_CUDA
@@ -22,4 +22,4 @@ template class Mesh<2, Kokkos::DefaultHostExecutionSpace, Kokkos::HostSpace>;
 
 //---------------------------------------------------------------------------//
 
-} // end namespace CajitaFluids
+} // end namespace CabanaFluids

@@ -3,11 +3,11 @@
  * @author Patrick Bridges <patrickb@unm.edu>
  *
  * @section DESCRIPTION
- * Inflow Sources Conditions for CajitaFluids
+ * Inflow Sources Conditions for CabanaFluids
  */
 
-#ifndef CAJITAFLUIDS_BODYFORCE_HPP
-#define CAJITAFLUIDS_BODYFORCE_HPP
+#ifndef CABANAFLUIDS_BODYFORCE_HPP
+#define CABANAFLUIDS_BODYFORCE_HPP
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -18,7 +18,7 @@
 
 #include <Kokkos_Core.hpp>
 
-namespace CajitaFluids
+namespace CabanaFluids
 {
 /**
  * @struct BodyForce
@@ -32,7 +32,7 @@ struct BodyForce<2>
 {
     template <class ArrayType>
     KOKKOS_INLINE_FUNCTION void
-    operator()( Cajita::Cell, [[maybe_unused]] ArrayType& d,
+    operator()( Cabana::Grid::Cell, [[maybe_unused]] ArrayType& d,
                 [[maybe_unused]] int i, [[maybe_unused]] int j,
                 [[maybe_unused]] double x, [[maybe_unused]] double y,
                 [[maybe_unused]] double delta_t,
@@ -43,7 +43,7 @@ struct BodyForce<2>
     /* Simple forward Euler for body forces */
     template <class ArrayType>
     KOKKOS_INLINE_FUNCTION void
-    operator()( Cajita::Face<Cajita::Dim::I>, ArrayType& ux, int i, int j,
+    operator()( Cabana::Grid::Face<Cabana::Grid::Dim::I>, ArrayType& ux, int i, int j,
                 [[maybe_unused]] double x, [[maybe_unused]] double y,
                 double delta_t, [[maybe_unused]] double v ) const
     {
@@ -52,7 +52,7 @@ struct BodyForce<2>
 
     template <class ArrayType>
     KOKKOS_INLINE_FUNCTION void
-    operator()( Cajita::Face<Cajita::Dim::J>, ArrayType& uy, int i, int j,
+    operator()( Cabana::Grid::Face<Cabana::Grid::Dim::J>, ArrayType& uy, int i, int j,
                 [[maybe_unused]] double x, [[maybe_unused]] double y,
                 double delta_t, [[maybe_unused]] double v ) const
     {
@@ -67,6 +67,6 @@ struct BodyForce<2>
 
     Kokkos::Array<double, 2> _force; /**< Force exerted on all cells. */
 };
-} // namespace CajitaFluids
+} // namespace CabanaFluids
 
 #endif

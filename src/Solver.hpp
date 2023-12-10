@@ -1,21 +1,18 @@
 /****************************************************************************
- * Copyright (c) 2018-2020 by the CajitaFluids authors                      *
+ * Copyright (c) 2018-2020 by the CabanaFluids authors                      *
  * All rights reserved.                                                     *
  *                                                                          *
- * This file is part of the CajitaFluids library. CajitaFluids is           *
+ * This file is part of the CabanaFluids library. CabanaFluids is           *
  * distributed under a BSD 3-clause license. For the licensing terms see    *
  * the LICENSE file in the top-level directory.                             *
  *                                                                          *
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CAJITAFLUIDS_SOLVER_HPP
-#define CAJITAFLUIDS_SOLVER_HPP
+#ifndef CABANAFLUIDS_SOLVER_HPP
+#define CABANAFLUIDS_SOLVER_HPP
 
-#include <Cajita_HypreStructuredSolver.hpp>
-#include <Cajita_Partitioner.hpp>
-#include <Cajita_ReferenceStructuredSolver.hpp>
-#include <Cajita_Types.hpp>
+#include <Cabana_Grid.hpp>
 
 #include <BodyForce.hpp>
 #include <BoundaryConditions.hpp>
@@ -32,7 +29,7 @@
 
 #include <mpi.h>
 
-namespace CajitaFluids
+namespace CabanaFluids
 {
 /*
  * Convenience base class so that examples that use this don't need to know
@@ -56,20 +53,20 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 {
   public:
     using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
-    using mesh_type = Cajita::UniformMesh<double, 2>;
+    using mesh_type = Cabana::Grid::UniformMesh<double, 2>;
     using cell_array =
-        Cajita::Array<double, Cajita::Cell, mesh_type, MemorySpace>;
+        Cabana::Grid::Array<double, Cabana::Grid::Cell, mesh_type, MemorySpace>;
     using pm_type = ProblemManager<2, ExecutionSpace, MemorySpace>;
     using bc_type = BoundaryCondition<2>;
 
-    using Cell = Cajita::Cell;
-    using FaceI = Cajita::Face<Cajita::Dim::I>;
-    using FaceJ = Cajita::Face<Cajita::Dim::J>;
+    using Cell = Cabana::Grid::Cell;
+    using FaceI = Cabana::Grid::Face<Cabana::Grid::Dim::I>;
+    using FaceJ = Cabana::Grid::Face<Cabana::Grid::Dim::J>;
 
     template <class InitFunc>
     Solver( MPI_Comm comm, const Kokkos::Array<double, 4>& global_bounding_box,
             const std::array<int, 2>& global_num_cell,
-            const Cajita::BlockPartitioner<2>& partitioner,
+            const Cabana::Grid::BlockPartitioner<2>& partitioner,
             const double density, const InitFunc& create_functor,
             const BoundaryCondition<2>& bc, const InflowSource<2>& source,
             const BodyForce<2>& body, const double delta_t,
@@ -186,8 +183,8 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
         double cell_size = _mesh->cellSize();
         double cell_area = cell_size * cell_size;
 
-        auto owned_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(),
-                                                  Cajita::Local() );
+        auto owned_cells = local_grid.indexSpace( Cabana::Grid::Own(), Cabana::Grid::Cell(),
+                                                  Cabana::Grid::Local() );
 
         // Create local variable versions of the class members to avoid needing
         // to use a (potentially expensive) class lambda
@@ -208,19 +205,19 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
                 local_mesh.coordinates( Cell(), idx, loc );
                 double x = loc[0], y = loc[1];
 
-                source( Cajita::Cell(), quantity, i, j, x, y, delta_t,
+                source( Cabana::Grid::Cell(), quantity, i, j, x, y, delta_t,
                         cell_area );
-                body( Cajita::Cell(), quantity, i, j, x, y, delta_t,
+                body( Cabana::Grid::Cell(), quantity, i, j, x, y, delta_t,
                       cell_area );
             } );
         Kokkos::Profiling::popRegion();
 
         Kokkos::Profiling::pushRegion( "Solve::AddInputs::FaceI" );
         auto owned_ifaces =
-            local_grid.indexSpace( Cajita::Own(), FaceI(), Cajita::Local() );
+            local_grid.indexSpace( Cabana::Grid::Own(), FaceI(), Cabana::Grid::Local() );
         auto ui = _pm->get( FaceI(), Field::Velocity(), Version::Current() );
         auto l2g_facei =
-            Cajita::IndexConversion::createL2G( local_grid, FaceI() );
+            Cabana::Grid::IndexConversion::createL2G( local_grid, FaceI() );
 
         Kokkos::parallel_for(
             "add external x velocity",
@@ -241,10 +238,10 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 
         Kokkos::Profiling::pushRegion( "Solve::AddInputs::FaceJ" );
         auto owned_jfaces =
-            local_grid.indexSpace( Cajita::Own(), FaceJ(), Cajita::Local() );
+            local_grid.indexSpace( Cabana::Grid::Own(), FaceJ(), Cabana::Grid::Local() );
         auto uj = _pm->get( FaceJ(), Field::Velocity(), Version::Current() );
         auto l2g_facej =
-            Cajita::IndexConversion::createL2G( local_grid, FaceJ() );
+            Cabana::Grid::IndexConversion::createL2G( local_grid, FaceJ() );
         Kokkos::parallel_for(
             "add external y velocity",
             createExecutionPolicy( owned_jfaces, ExecutionSpace() ),
@@ -286,7 +283,7 @@ std::shared_ptr<SolverBase>
 createSolver( const std::string& device, MPI_Comm comm,
               const Kokkos::Array<double, 4>& global_bounding_box,
               const std::array<int, 2>& global_num_cell,
-              const Cajita::BlockPartitioner<2>& partitioner,
+              const Cabana::Grid::BlockPartitioner<2>& partitioner,
               const double density, const InitFunc& create_functor,
               const BoundaryCondition<2>& bc, const InflowSource<2>& source,
               const BodyForce<2>& body, const double delta_t,
@@ -299,7 +296,7 @@ createSolver( const std::string& device, MPI_Comm comm,
 // to set it up to use a different solver in that case
 #if defined( KOKKOS_ENABLE_SERIAL ) && !defined( KOKKOS_ENABLE_CUDA )
         return std::make_shared<
-            CajitaFluids::Solver<2, Kokkos::Serial, Kokkos::HostSpace>>(
+            CabanaFluids::Solver<2, Kokkos::Serial, Kokkos::HostSpace>>(
             comm, global_bounding_box, global_num_cell, partitioner, density,
             create_functor, bc, source, body, delta_t, matrix_solver,
             preconditioner );
@@ -311,7 +308,7 @@ createSolver( const std::string& device, MPI_Comm comm,
     {
 #if defined( KOKKOS_ENABLE_OPENMP ) && !defined( KOKKOS_ENABLE_CUDA )
         return std::make_shared<
-            CajitaFluids::Solver<2, Kokkos::OpenMP, Kokkos::HostSpace>>(
+            CabanaFluids::Solver<2, Kokkos::OpenMP, Kokkos::HostSpace>>(
             comm, global_bounding_box, global_num_cell, partitioner, density,
             create_functor, bc, source, body, delta_t, matrix_solver,
             preconditioner );
@@ -323,7 +320,7 @@ createSolver( const std::string& device, MPI_Comm comm,
     {
 #ifdef KOKKOS_ENABLE_CUDA
         return std::make_shared<
-            CajitaFluids::Solver<2, Kokkos::Cuda, Kokkos::CudaSpace>>(
+            CabanaFluids::Solver<2, Kokkos::Cuda, Kokkos::CudaSpace>>(
             comm, global_bounding_box, global_num_cell, partitioner, density,
             create_functor, bc, source, body, delta_t, matrix_solver,
             preconditioner );
@@ -334,7 +331,7 @@ createSolver( const std::string& device, MPI_Comm comm,
     else if ( 0 == device.compare( "hip" ) )
     {
 #ifdef KOKKOS_ENABLE_HIP
-        return std::make_shared<CajitaFluids::Solver<
+        return std::make_shared<CabanaFluids::Solver<
             2, Kokkos : Experimental::HIP, Kokkos::Experimental::HIPSpace>>(
             comm, global_bounding_box, global_num_cell, partitioner, density,
             create_functor, bc, source, body, delta_t, matrix_solver,
@@ -352,6 +349,6 @@ createSolver( const std::string& device, MPI_Comm comm,
 
 //---------------------------------------------------------------------------//
 
-} // end namespace CajitaFluids
+} // end namespace CabanaFluids
 
-#endif // end CAJITAFLUIDS_SOLVER_HPP
+#endif // end CABANAFLUIDS_SOLVER_HPP

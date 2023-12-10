@@ -1,26 +1,24 @@
 /****************************************************************************
- * Copyright (c) 2022 by the CajitaFluids authors                           *
+ * Copyright (c) 2022 by the CabanaFluids authors                           *
  * All rights reserved.                                                     *
  *                                                                          *
- * This file is part of the CajitaFluids library. CajitaFluids is           *
+ * This file is part of the CabanaFluids library. CabanaFluids is           *
  * distributed under a BSD 3-clause license. For the licensing terms see    *
  * the LICENSE file in the top-level directory.                             *
  *                                                                          *
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CAJITAFLUIDS_TIMEINTEGRATOR_HPP
-#define CAJITAFLUIDS_TIMEINTEGRATOR_HPP
+#ifndef CABANAFLUIDS_TIMEINTEGRATOR_HPP
+#define CABANAFLUIDS_TIMEINTEGRATOR_HPP
 
 #include <BoundaryConditions.hpp>
 #include <Interpolation.hpp>
 #include <ProblemManager.hpp>
 
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 
-#include <Kokkos_Core.hpp>
-
-namespace CajitaFluids
+namespace CabanaFluids
 {
 
 // These routines use state in other classes and don't need state themselves,
@@ -28,10 +26,10 @@ namespace CajitaFluids
 namespace TimeIntegrator
 {
 
-using Cell = Cajita::Cell;
-using FaceI = Cajita::Face<Cajita::Dim::I>;
-using FaceJ = Cajita::Face<Cajita::Dim::J>;
-using FaceK = Cajita::Face<Cajita::Dim::K>;
+using Cell = Cabana::Grid::Cell;
+using FaceI = Cabana::Grid::Face<Cabana::Grid::Dim::I>;
+using FaceJ = Cabana::Grid::Face<Cabana::Grid::Dim::J>;
+using FaceK = Cabana::Grid::Face<Cabana::Grid::Dim::K>;
 
 template <std::size_t NumSpaceDims, class Mesh_t, class View_t>
 KOKKOS_FUNCTION void
@@ -95,7 +93,7 @@ void advect( ExecutionSpace& exec_space, ProblemManagerType& pm, double delta_t,
     auto local_mesh = *( pm.mesh()->localMesh() );
 
     auto owned_items =
-        local_grid->indexSpace( Cajita::Own(), entity, Cajita::Local() );
+        local_grid->indexSpace( Cabana::Grid::Own(), entity, Cabana::Grid::Local() );
     parallel_for(
         "advection loop", createExecutionPolicy( owned_items, exec_space ),
         KOKKOS_LAMBDA( int i, int j ) {
@@ -160,7 +158,7 @@ void step( const ExecutionSpace& exec_space, ProblemManagerType& pm,
     }
     Kokkos::Profiling::popRegion();
 
-    Kokkos::Profiling::pushRegion( "CajitaFluids::TimeIntegrator::Advance" );
+    Kokkos::Profiling::pushRegion( "CabanaFluids::TimeIntegrator::Advance" );
     // Once all calculations with the current versions of the fields (including
     // Velocity!) are done, swap the old values with the new one to finish the
     // time step.
@@ -179,6 +177,6 @@ void step( const ExecutionSpace& exec_space, ProblemManagerType& pm,
 //---------------------------------------------------------------------------//
 
 } // end namespace TimeIntegrator
-} // end namespace CajitaFluids
+} // end namespace CabanaFluids
 
-#endif // CAJITAFLUIDS_TIMEINTEGRATOR_HPP
+#endif // CABANAFLUIDS_TIMEINTEGRATOR_HPP

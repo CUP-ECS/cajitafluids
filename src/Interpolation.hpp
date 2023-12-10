@@ -1,30 +1,31 @@
 /****************************************************************************
- * Copyright (c) 2022 by the CajitaFluids authors                           *
+ * Copyright (c) 2022 by the CabanaFluids authors                           *
  * All rights reserved.                                                     *
  *                                                                          *
- * This file is part of the CajitaFluids library. CajitaFluids is           *
+ * This file is part of the CabanaFluids library. CabanaFluids is           *
  * distributed under a BSD 3-clause license. For the licensing terms see    *
  * the LICENSE file in the top-level directory.                             *
  *                                                                          *
  * SPDX-License-Identifier: BSD-3-Clause                                    *
  ****************************************************************************/
 
-#ifndef CAJITAFLUIDS_INTERPOLATION_HPP
-#define CAJITAFLUIDS_INTERPOLATION_HPP
+#ifndef CABANAFLUIDS_INTERPOLATION_HPP
+#define CABANAFLUIDS_INTERPOLATION_HPP
 
-#include <Cajita.hpp>
-#include <ProblemManager.hpp>
 
+#include <Cabana_Grid.hpp>
 #include <Kokkos_Core.hpp>
 
-namespace CajitaFluids
+#include <ProblemManager.hpp>
+
+namespace CabanaFluids
 {
 namespace Interpolation
 {
-using Cell = Cajita::Cell;
-using FaceI = Cajita::Face<Cajita::Dim::I>;
-using FaceJ = Cajita::Face<Cajita::Dim::J>;
-using FaceK = Cajita::Face<Cajita::Dim::K>;
+using Cell = Cabana::Grid::Cell;
+using FaceI = Cabana::Grid::Face<Cabana::Grid::Dim::I>;
+using FaceJ = Cabana::Grid::Face<Cabana::Grid::Dim::J>;
+using FaceK = Cabana::Grid::Face<Cabana::Grid::Dim::K>;
 
 // Spline to interpolate values for advection.
 template <std::size_t NumSpaceDims, std::size_t order, class Entity_t,
@@ -34,9 +35,9 @@ KOKKOS_INLINE_FUNCTION double interpolateField( const double loc[NumSpaceDims],
                                                 const View_t& field )
 {
     double value;
-    Cajita::SplineData<double, order, NumSpaceDims, Entity_t> spline;
-    Cajita::evaluateSpline( local_mesh, loc, spline );
-    Cajita::G2P::value( field, spline, value );
+    Cabana::Grid::SplineData<double, order, NumSpaceDims, Entity_t> spline;
+    Cabana::Grid::evaluateSpline( local_mesh, loc, spline );
+    Cabana::Grid::G2P::value( field, spline, value );
     return value;
 }
 
@@ -54,6 +55,6 @@ KOKKOS_INLINE_FUNCTION void interpolateVelocity( const double loc[NumSpaceDims],
 }
 
 } // end namespace Interpolation
-} // end namespace CajitaFluids
+} // end namespace CabanaFluids
 
-#endif // end CAJITAFLUIDS_INTERPOLATION_HPP
+#endif // end CABANAFLUIDS_INTERPOLATION_HPP

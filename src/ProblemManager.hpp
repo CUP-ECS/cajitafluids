@@ -8,8 +8,8 @@
  * scatters and gathers
  */
 
-#ifndef CAJITAFLUIDS_PROBLEMMANAGER_HPP
-#define CAJITAFLUIDS_PROBLEMMANAGER_HPP
+#ifndef CABANAFLUIDS_PROBLEMMANAGER_HPP
+#define CABANAFLUIDS_PROBLEMMANAGER_HPP
 
 #ifndef DEBUG
 #define DEBUG 0
@@ -17,14 +17,13 @@
 
 // Include Statements
 #include <Cabana_Core.hpp>
-#include <Cajita.hpp>
-#include <Kokkos_Core.hpp>
+#include <Cabana_Grid.hpp>
 
 #include <memory>
 
 #include <Mesh.hpp>
 
-namespace CajitaFluids
+namespace CabanaFluids
 {
 
 /**
@@ -102,26 +101,26 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     using execution_space = ExecutionSpace;
     using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
 
-    using Cell = Cajita::Cell;
-    using FaceI = Cajita::Face<Cajita::Dim::I>;
-    using FaceJ = Cajita::Face<Cajita::Dim::J>;
-    using FaceK = Cajita::Face<Cajita::Dim::K>;
+    using Cell = Cabana:Grid::Cell;
+    using FaceI = Cabana:Grid::Face<Cabana:Grid::Dim::I>;
+    using FaceJ = Cabana:Grid::Face<Cabana:Grid::Dim::J>;
+    using FaceK = Cabana:Grid::Face<Cabana:Grid::Dim::K>;
 
     using cell_array =
-        Cajita::Array<double, Cajita::Cell, Cajita::UniformMesh<double, 2>,
+        Cabana:Grid::Array<double, Cabana:Grid::Cell, Cabana:Grid::UniformMesh<double, 2>,
                       MemorySpace>;
     using iface_array =
-        Cajita::Array<double, Cajita::Face<Cajita::Dim::I>,
-                      Cajita::UniformMesh<double, 2>, MemorySpace>;
+        Cabana:Grid::Array<double, Cabana:Grid::Face<Cabana:Grid::Dim::I>,
+                      Cabana:Grid::UniformMesh<double, 2>, MemorySpace>;
     using jface_array =
-        Cajita::Array<double, Cajita::Face<Cajita::Dim::J>,
-                      Cajita::UniformMesh<double, 2>, MemorySpace>;
+        Cabana:Grid::Array<double, Cabana:Grid::Face<Cabana:Grid::Dim::J>,
+                      Cabana:Grid::UniformMesh<double, 2>, MemorySpace>;
 
     // Meaningless type for now until we have 3D support in.
     using kface_array =
-        Cajita::Array<double, Cajita::Face<Cajita::Dim::K>,
-                      Cajita::UniformMesh<double, 2>, MemorySpace>;
-    using halo_type = Cajita::Halo<MemorySpace>;
+        Cabana:Grid::Array<double, Cabana:Grid::Face<Cabana:Grid::Dim::K>,
+                      Cabana:Grid::UniformMesh<double, 2>, MemorySpace>;
+    using halo_type = Cabana:Grid::Halo<MemorySpace>;
     using mesh_type = Mesh<2, ExecutionSpace, MemorySpace>;
 
     template <class InitFunc>
@@ -133,36 +132,36 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         // The layouts of our various arrays for values on the staggered mesh
         // and other associated data strutures. Do there need to be version with
         // halos associuated with them?
-        auto iface_scalar_layout = Cajita::createArrayLayout(
-            _mesh->localGrid(), 1, Cajita::Face<Cajita::Dim::I>() );
-        auto jface_scalar_layout = Cajita::createArrayLayout(
-            _mesh->localGrid(), 1, Cajita::Face<Cajita::Dim::J>() );
+        auto iface_scalar_layout = Cabana:Grid::createArrayLayout(
+            _mesh->localGrid(), 1, Cabana:Grid::Face<Cabana:Grid::Dim::I>() );
+        auto jface_scalar_layout = Cabana:Grid::createArrayLayout(
+            _mesh->localGrid(), 1, Cabana:Grid::Face<Cabana:Grid::Dim::J>() );
         auto cell_scalar_layout =
-            Cajita::createArrayLayout( _mesh->localGrid(), 1, Cajita::Cell() );
+            Cabana:Grid::createArrayLayout( _mesh->localGrid(), 1, Cabana:Grid::Cell() );
 
         // The actual arrays storing mesh quantities
         // 1. The quantity of the scalar quantity being advected
-        _quantity_curr = Cajita::createArray<double, MemorySpace>(
+        _quantity_curr = Cabana:Grid::createArray<double, MemorySpace>(
             "quantity", cell_scalar_layout );
-        _quantity_next = Cajita::createArray<double, MemorySpace>(
+        _quantity_next = Cabana:Grid::createArray<double, MemorySpace>(
             "quantity", cell_scalar_layout );
-        Cajita::ArrayOp::assign( *_quantity_curr, 0.0, Cajita::Ghost() );
-        Cajita::ArrayOp::assign( *_quantity_next, 0.0, Cajita::Ghost() );
+        Cabana:Grid::ArrayOp::assign( *_quantity_curr, 0.0, Cabana:Grid::Ghost() );
+        Cabana:Grid::ArrayOp::assign( *_quantity_next, 0.0, Cabana:Grid::Ghost() );
 
         // 2. The magnitudes of the velocities normal to the cell faces
-        _u_curr = Cajita::createArray<double, MemorySpace>(
+        _u_curr = Cabana:Grid::createArray<double, MemorySpace>(
             "u0", iface_scalar_layout );
-        _u_next = Cajita::createArray<double, MemorySpace>(
+        _u_next = Cabana:Grid::createArray<double, MemorySpace>(
             "u1", iface_scalar_layout );
-        Cajita::ArrayOp::assign( *_u_curr, 0.0, Cajita::Ghost() );
-        Cajita::ArrayOp::assign( *_u_next, 0.0, Cajita::Ghost() );
+        Cabana:Grid::ArrayOp::assign( *_u_curr, 0.0, Cabana:Grid::Ghost() );
+        Cabana:Grid::ArrayOp::assign( *_u_next, 0.0, Cabana:Grid::Ghost() );
 
-        _v_curr = Cajita::createArray<double, MemorySpace>(
+        _v_curr = Cabana:Grid::createArray<double, MemorySpace>(
             "v0", jface_scalar_layout );
-        _v_next = Cajita::createArray<double, MemorySpace>(
+        _v_next = Cabana:Grid::createArray<double, MemorySpace>(
             "v1", jface_scalar_layout );
-        Cajita::ArrayOp::assign( *_v_curr, 0.0, Cajita::Ghost() );
-        Cajita::ArrayOp::assign( *_v_next, 0.0, Cajita::Ghost() );
+        Cabana:Grid::ArrayOp::assign( *_v_curr, 0.0, Cabana:Grid::Ghost() );
+        Cabana:Grid::ArrayOp::assign( *_v_next, 0.0, Cabana:Grid::Ghost() );
 
         // Halo patterns for the velocity and quantity advection. These halos
         // are are three cells deep because: We only allow quantities to advect
@@ -172,7 +171,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         // outside our boundary.
         int halo_depth = _mesh->localGrid()->haloCellWidth();
         _advection_halo =
-            Cajita::createHalo( Cajita::NodeHaloPattern<2>(), halo_depth,
+            Cabana:Grid::createHalo( Cabana:Grid::NodeHaloPattern<2>(), halo_depth,
                                 *_quantity_curr, *_u_curr, *_v_curr );
 
         // Initialize State Values ( quantity and velocity )
@@ -196,17 +195,17 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
         double cell_size = _mesh->cellSize();
 
         // Get State Arrays
-        auto q = get( Cajita::Cell(), Field::Quantity(), Version::Current() );
+        auto q = get( Cabana:Grid::Cell(), Field::Quantity(), Version::Current() );
 
         // Loop Over All Owned Cells ( i, j )
-        auto own_cells = local_grid.indexSpace( Cajita::Own(), Cajita::Cell(),
-                                                Cajita::Local() );
+        auto own_cells = local_grid.indexSpace( Cabana:Grid::Own(), Cabana:Grid::Cell(),
+                                                Cabana:Grid::Local() );
         int index[2] = { 0, 0 };
         double loc[2]; // x/y loocation of the cell at 0, 0
-        local_mesh.coordinates( Cajita::Cell(), index, loc );
+        local_mesh.coordinates( Cabana:Grid::Cell(), index, loc );
         Kokkos::parallel_for(
             "Initialize Cells`",
-            Cajita::createExecutionPolicy( own_cells, ExecutionSpace() ),
+            Cabana:Grid::createExecutionPolicy( own_cells, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
                 // Get Coordinates Associated with Indices ( i, j, k )
                 int coords[2] = { i, j };
@@ -214,19 +213,19 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
                 x[0] = loc[0] + cell_size * i;
                 x[1] = loc[1] + cell_size * j;
                 // Initialization Function
-                create_functor( Cajita::Cell(), Field::Quantity(), coords, x,
+                create_functor( Cabana:Grid::Cell(), Field::Quantity(), coords, x,
                                 q( i, j, 0 ) );
             } );
 
         // Loop Over All Owned I-Faces ( i, j )
         auto own_faces = local_grid.indexSpace(
-            Cajita::Own(), Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
-        auto u = get( Cajita::Face<Cajita::Dim::I>(), Field::Velocity(),
+            Cabana:Grid::Own(), Cabana:Grid::Face<Cabana:Grid::Dim::I>(), Cabana:Grid::Local() );
+        auto u = get( Cabana:Grid::Face<Cabana:Grid::Dim::I>(), Field::Velocity(),
                       Version::Current() );
-        local_mesh.coordinates( Cajita::Face<Cajita::Dim::I>(), index, loc );
+        local_mesh.coordinates( Cabana:Grid::Face<Cabana:Grid::Dim::I>(), index, loc );
         Kokkos::parallel_for(
             "Initialize I-Faces",
-            Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ),
+            Cabana:Grid::createExecutionPolicy( own_faces, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
                 // Get Coordinates Associated with Indices ( i, j )
                 int coords[2] = { i, j };
@@ -235,19 +234,19 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
                 x[1] = loc[1] + cell_size * j;
 
                 // Initialization Function
-                create_functor( Cajita::Face<Cajita::Dim::I>(),
+                create_functor( Cabana:Grid::Face<Cabana:Grid::Dim::I>(),
                                 Field::Velocity(), coords, x, u( i, j, 0 ) );
             } );
 
         // Loop Over All Owned J-Faces ( i, j )
         own_faces = local_grid.indexSpace(
-            Cajita::Own(), Cajita::Face<Cajita::Dim::J>(), Cajita::Local() );
-        auto v = get( Cajita::Face<Cajita::Dim::J>(), Field::Velocity(),
+            Cabana:Grid::Own(), Cabana:Grid::Face<Cabana:Grid::Dim::J>(), Cabana:Grid::Local() );
+        auto v = get( Cabana:Grid::Face<Cabana:Grid::Dim::J>(), Field::Velocity(),
                       Version::Current() );
-        local_mesh.coordinates( Cajita::Face<Cajita::Dim::J>(), index, loc );
+        local_mesh.coordinates( Cabana:Grid::Face<Cabana:Grid::Dim::J>(), index, loc );
         Kokkos::parallel_for(
             "Initialize J-Faces",
-            Cajita::createExecutionPolicy( own_faces, ExecutionSpace() ),
+            Cabana:Grid::createExecutionPolicy( own_faces, ExecutionSpace() ),
             KOKKOS_LAMBDA( const int i, const int j ) {
                 // Get Coordinates Associated with Indices ( i, j )
                 int coords[2] = { i, j };
@@ -257,7 +256,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
                 x[1] = loc[1] + cell_size * j;
 
                 // Initialization Function
-                create_functor( Cajita::Face<Cajita::Dim::J>(),
+                create_functor( Cabana:Grid::Face<Cabana:Grid::Dim::J>(),
                                 Field::Velocity(), coords, x, v( i, j, 0 ) );
             } );
     };
@@ -278,7 +277,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Version::Current
      * @return Returns view of current advected quantity at cell centers
      **/
-    typename cell_array::view_type get( Cajita::Cell, Field::Quantity,
+    typename cell_array::view_type get( Cabana:Grid::Cell, Field::Quantity,
                                         Version::Current ) const
     {
         return _quantity_curr->view();
@@ -291,7 +290,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Version::Next
      * @return Returns view of next advected quantity at cell centers
      **/
-    typename cell_array::view_type get( Cajita::Cell, Field::Quantity,
+    typename cell_array::view_type get( Cabana:Grid::Cell, Field::Quantity,
                                         Version::Next ) const
     {
         return _quantity_next->view();
@@ -305,7 +304,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @return Returns view of current norm velocity magnitude on i faces
      **/
     typename cell_array::view_type
-    get( Cajita::Face<Cajita::Dim::I>, Field::Velocity, Version::Current ) const
+    get( Cabana:Grid::Face<Cabana:Grid::Dim::I>, Field::Velocity, Version::Current ) const
     {
         return _u_curr->view();
     };
@@ -317,7 +316,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Version::Next
      * @return Returns view of next norm velocity magnitude on i faces
      **/
-    typename cell_array::view_type get( Cajita::Face<Cajita::Dim::I>,
+    typename cell_array::view_type get( Cabana:Grid::Face<Cabana:Grid::Dim::I>,
                                         Field::Velocity, Version::Next ) const
     {
         return _u_next->view();
@@ -331,7 +330,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @return Returns view of current norm velocity magnitude on j faces
      **/
     typename cell_array::view_type
-    get( Cajita::Face<Cajita::Dim::J>, Field::Velocity, Version::Current ) const
+    get( Cabana:Grid::Face<Cabana:Grid::Dim::J>, Field::Velocity, Version::Current ) const
     {
         return _v_curr->view();
     };
@@ -343,7 +342,7 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
      * @param Version::Next
      * @return Returns view of next norm velocity magnitude on j faces
      **/
-    typename cell_array::view_type get( Cajita::Face<Cajita::Dim::J>,
+    typename cell_array::view_type get( Cabana:Grid::Face<Cabana:Grid::Dim::J>,
                                         Field::Velocity, Version::Next ) const
     {
         return _v_next->view();
@@ -351,30 +350,30 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
 
     /**
      * Make the next version of a field the current one
-     * @param Cajita::Cell
+     * @param Cabana:Grid::Cell
      * @param Field::Quantity
      **/
-    void advance( Cajita::Cell, Field::Quantity )
+    void advance( Cabana:Grid::Cell, Field::Quantity )
     {
         _quantity_curr.swap( _quantity_next );
     }
 
     /**
      * Make the next version of a field the current one
-     * @param Cajita::Face<Cajita::DimI>
+     * @param Cabana:Grid::Face<Cabana:Grid::DimI>
      * @param Field::Velocity
      **/
-    void advance( Cajita::Face<Cajita::Dim::I>, Field::Velocity )
+    void advance( Cabana:Grid::Face<Cabana:Grid::Dim::I>, Field::Velocity )
     {
         _u_curr.swap( _u_next );
     }
 
     /**
      * Make the next version of a field the current one
-     * @param Cajita::Face<Cajita::Dim::J>
+     * @param Cabana:Grid::Face<Cabana:Grid::Dim::J>
      * @param Field::Velocity
      **/
-    void advance( Cajita::Face<Cajita::Dim::J>, Field::Velocity )
+    void advance( Cabana:Grid::Face<Cabana:Grid::Dim::J>, Field::Velocity )
     {
         _v_curr.swap( _v_next );
     }
@@ -417,6 +416,6 @@ class ProblemManager<2, ExecutionSpace, MemorySpace>
     // std::shared_ptr<halo_type> _cell_pressure_halo;
 };
 
-} // namespace CajitaFluids
+} // namespace CabanaFluids
 
-#endif // CAJITAFLUIDS_PROBLEMMANAGER_HPP
+#endif // CABANAFLUIDS_PROBLEMMANAGER_HPP

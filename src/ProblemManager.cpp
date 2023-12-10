@@ -1,8 +1,8 @@
 /****************************************************************************
- * Copyright (c) 2018-2020 by the CajitaFluids authors                      *
+ * Copyright (c) 2018-2020 by the CabanaFluids authors                      *
  * All rights reserved.                                                     *
  *                                                                          *
- * This file is part of the CajitaFluids benchmark. CajitaFluids is         *
+ * This file is part of the CabanaFluids benchmark. CabanaFluids is         *
  * distributed under a BSD 3-clause license. For the licensing terms see    *
  * the LICENSE file in the top-level directory.                             *
  *                                                                          *
@@ -12,7 +12,7 @@
 #include <ProblemManager.hpp>
 #include <Solver.hpp>
 
-namespace CajitaFluids
+namespace CabanaFluids
 {
 //---------------------------------------------------------------------------//
 template class ProblemManager<2, Kokkos::DefaultHostExecutionSpace,
@@ -20,4 +20,4 @@ template class ProblemManager<2, Kokkos::DefaultHostExecutionSpace,
 
 //---------------------------------------------------------------------------//
 
-} // end namespace CajitaFluids
+} // end namespace CabanaFluids
