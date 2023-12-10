@@ -48,7 +48,7 @@ template <class T>
 class ProblemManagerTest : public MeshTest<T>
 {
 
-    using pm_type = Cabana::Grid::ProblemManager<2, typename T::ExecutionSpace,
+    using pm_type = CabanaFluids::ProblemManager<2, typename T::ExecutionSpace,
                                                  typename T::MemorySpace>;
 
   protected:

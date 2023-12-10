@@ -1,7 +1,7 @@
 blt_add_executable(NAME tstMesh
                    SOURCES tstMesh.cpp 
                    INCLUDES tstMesh.hpp 
-                   DEPENDS_ON cabanafluids gtest)
+                   DEPENDS_ON cabanafluids Cabana::Core Cabana::Grid gtest)
 blt_add_test(NAME MeshTests
              COMMAND tstMesh)
 

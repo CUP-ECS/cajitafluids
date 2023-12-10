@@ -38,7 +38,7 @@ class MeshTest : public ::testing::Test
     using jface_array =
         Cabana::Grid::Array<double, Cabana::Grid::Face<Cabana::Grid::Dim::J>,
                       Cabana::Grid::UniformMesh<double, 2>, typename T::MemorySpace>;
-    using mesh_type = Cabana::Grid::Mesh<2, typename T::ExecutionSpace,
+    using mesh_type = CabanaFluids::Mesh<2, typename T::ExecutionSpace,
                                          typename T::MemorySpace>;
 
   protected:

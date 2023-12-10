@@ -27,7 +27,7 @@ set(INCLUDES
     ${CMAKE_CURRENT_BINARY_DIR}
   )
        
-blt_add_library( NAME cajitafluids
+blt_add_library( NAME cabanafluids
                  HEADERS ${HEADERS}
                  SOURCES ${SOURCES}
                  INCLUDES ${INCLUDES}
