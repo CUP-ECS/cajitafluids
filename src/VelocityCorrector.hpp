@@ -107,8 +107,8 @@ class VelocityCorrector<2, ExecutionSpace, MemorySpace, SparseSolver>
         // we share a face so that we can correct velocities on those faces.
         // Note that this is a much simpler and shallower halo poattern than the
         // ones used for advection.
-        _pressure_halo = Cabana::Grid::createHalo<double, MemorySpace>(
-            *vector_layout, Cabana::Grid::FaceHaloPattern<2>(), 1 );
+        _pressure_halo = Cabana::Grid::createHalo( Cabana::Grid::FaceHaloPattern<2>(),
+                             1, *_lhs );
     }
 
     template <class View_t>

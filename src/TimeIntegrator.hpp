@@ -90,7 +90,7 @@ void advect( ExecutionSpace& exec_space, ProblemManagerType& pm, double delta_t,
     //    auto w = pm.get(FaceK(), Field::Velocity(), Version::Current());
 
     auto local_grid = pm.mesh()->localGrid();
-    auto local_mesh = Cabana::Grid::createLocalMesh<pm::memory_space>(*local_grid);
+    auto local_mesh = Cabana::Grid::createLocalMesh<typename ProblemManagerType::memory_space>(*local_grid);
 
     auto owned_items =
         local_grid->indexSpace( Cabana::Grid::Own(), entity, Cabana::Grid::Local() );
