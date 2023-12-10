@@ -1,5 +1,5 @@
 #include <Cabana_Core.hpp>
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 #include <Kokkos_Core.hpp>
 #include <ProblemManager.hpp>
 
@@ -11,14 +11,14 @@
 
 TYPED_TEST_SUITE( ProblemManagerTest, MeshDeviceTypes );
 
-using Cell = Cajita::Cell;
-using FaceI = Cajita::Face<Cajita::Dim::I>;
-using FaceJ = Cajita::Face<Cajita::Dim::J>;
-using FaceK = Cajita::Face<Cajita::Dim::K>;
-using Quantity = CajitaFluids::Field::Quantity;
-using Velocity = CajitaFluids::Field::Velocity;
-using Current = CajitaFluids::Version::Current;
-using Next = CajitaFluids::Version::Next;
+using Cell = Cabana::Grid::Cell;
+using FaceI = Cabana::Grid::Face<Cabana::Grid::Dim::I>;
+using FaceJ = Cabana::Grid::Face<Cabana::Grid::Dim::J>;
+using FaceK = Cabana::Grid::Face<Cabana::Grid::Dim::K>;
+using Quantity = CabanaFluids::Field::Quantity;
+using Velocity = CabanaFluids::Field::Velocity;
+using Current = CabanaFluids::Version::Current;
+using Next = CabanaFluids::Version::Next;
 
 TYPED_TEST( ProblemManagerTest, StateArrayTest )
 {
@@ -37,8 +37,8 @@ TYPED_TEST( ProblemManagerTest, StateArrayTest )
      * FaceJ: +2
      * Next(): +5
      */
-    auto qspace = mesh->localGrid()->indexSpace( Cajita::Own(), Cell(),
-                                                 Cajita ::Local() );
+    auto qspace = mesh->localGrid()->indexSpace( Cabana::Grid::Own(), Cell(),
+                                                 Cabana::Grid ::Local() );
     Kokkos::parallel_for(
         "InitializeCellFields",
         createExecutionPolicy( qspace, ExecutionSpace() ),
@@ -66,8 +66,8 @@ TYPED_TEST( ProblemManagerTest, HaloTest )
     auto mesh = pm->mesh();
     auto rank = mesh->rank();
     auto ucurr = pm->get( FaceI(), Velocity(), Current() );
-    auto uspace = mesh->localGrid()->indexSpace( Cajita::Own(), FaceI(),
-                                                 Cajita ::Local() );
+    auto uspace = mesh->localGrid()->indexSpace( Cabana::Grid::Own(), FaceI(),
+                                                 Cabana::Grid ::Local() );
     Kokkos::parallel_for(
         "InitializeFaceIFields",
         createExecutionPolicy( uspace, ExecutionSpace() ),
@@ -87,7 +87,7 @@ TYPED_TEST( ProblemManagerTest, HaloTest )
         auto dir = directions[i];
         int neighbor_rank = mesh->localGrid()->neighborRank( dir );
         auto u_shared_space = mesh->localGrid()->sharedIndexSpace(
-            Cajita::Ghost(), FaceI(), dir );
+            Cabana::Grid::Ghost(), FaceI(), dir );
         for ( int i = u_shared_space.min( 0 ); i < u_shared_space.max( 0 );
               i++ )
             for ( int j = u_shared_space.min( 1 ); j < u_shared_space.max( 1 );

@@ -52,6 +52,7 @@ template <class ExecutionSpace, class MemorySpace>
 class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
 {
   public:
+    using memory_space = MemorySpace;
     using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
     using mesh_type = Cabana::Grid::UniformMesh<double, 2>;
     using cell_array =
@@ -179,7 +180,7 @@ class Solver<2, ExecutionSpace, MemorySpace> : public SolverBase
     void _addInputs()
     {
         auto local_grid = *( _mesh->localGrid() );
-        auto local_mesh = *( _mesh->localMesh() );
+        auto local_mesh = Cabana::Grid::createLocalMesh<memory_space>(local_grid);
         double cell_size = _mesh->cellSize();
         double cell_area = cell_size * cell_size;
 

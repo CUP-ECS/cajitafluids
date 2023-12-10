@@ -19,7 +19,7 @@
 #include <Solver.hpp>
 
 #include <Cabana_Core.hpp>
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 #include <Kokkos_Core.hpp>
 
 #include <mpi.h>
@@ -34,7 +34,7 @@
 #include <iostream>
 #include <stdlib.h>
 
-using namespace CajitaFluids;
+using namespace CabanaFluids;
 
 // Short Args: n - Cell Count, s - Domain Size,
 // x - On-node Parallelism ( Serial/Threaded/OpenMP/CUDA ),
@@ -393,7 +393,7 @@ struct MeshInitFunc
     };
 
     KOKKOS_INLINE_FUNCTION
-    bool operator()( Cajita::Cell, CajitaFluids::Field::Quantity,
+    bool operator()( Cabana::Grid::Cell, CabanaFluids::Field::Quantity,
                      [[maybe_unused]] const int index[Dim],
                      [[maybe_unused]] const double x[Dim],
                      double& quantity ) const
@@ -403,8 +403,8 @@ struct MeshInitFunc
         return true;
     };
     KOKKOS_INLINE_FUNCTION
-    bool operator()( Cajita::Face<Cajita::Dim::I>,
-                     CajitaFluids::Field::Velocity,
+    bool operator()( Cabana::Grid::Face<Cabana::Grid::Dim::I>,
+                     CabanaFluids::Field::Velocity,
                      [[maybe_unused]] const int index[Dim],
                      [[maybe_unused]] const double x[Dim],
                      double& xvelocity ) const
@@ -413,8 +413,8 @@ struct MeshInitFunc
         return true;
     };
     KOKKOS_INLINE_FUNCTION
-    bool operator()( Cajita::Face<Cajita::Dim::J>,
-                     CajitaFluids::Field::Velocity,
+    bool operator()( Cabana::Grid::Face<Cabana::Grid::Dim::J>,
+                     CabanaFluids::Field::Velocity,
                      [[maybe_unused]] const int index[Dim],
                      [[maybe_unused]] const double x[Dim],
                      double& yvelocity ) const
@@ -424,7 +424,7 @@ struct MeshInitFunc
     }
 #if 0
     KOKKOS_INLINE_FUNCTION
-    bool operator()( Cajita::Face<Cajita::Dim::K>, 
+    bool operator()( Cabana::Grid::Face<Cabana::Grid::Dim::K>, 
                      [[maybe_unused]] const int coords[Dim], 
 		     [[maybe_unused]] const int x[Dim], 
 	             double &zvelocity ) const {
@@ -441,18 +441,18 @@ void advect( ClArgs& cl )
     MPI_Comm_size( MPI_COMM_WORLD, &comm_size ); // Number of Ranks
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );      // Get My Rank
 
-    Cajita::DimBlockPartitioner<2> partitioner; // Create Cajita Partitioner
-    CajitaFluids::BoundaryCondition<2> bc;
+    Cabana::Grid::DimBlockPartitioner<2> partitioner; // Create Cajita Partitioner
+    CabanaFluids::BoundaryCondition<2> bc;
     bc.boundary_type = {
-        CajitaFluids::BoundaryType::SOLID, CajitaFluids::BoundaryType::SOLID,
-        CajitaFluids::BoundaryType::SOLID, CajitaFluids::BoundaryType::SOLID };
+        CabanaFluids::BoundaryType::SOLID, CabanaFluids::BoundaryType::SOLID,
+        CabanaFluids::BoundaryType::SOLID, CabanaFluids::BoundaryType::SOLID };
 
-    CajitaFluids::InflowSource<2> source( cl.inLocation, cl.inSize,
+    CabanaFluids::InflowSource<2> source( cl.inLocation, cl.inSize,
                                           cl.inVelocity, cl.inQuantity );
-    CajitaFluids::BodyForce<2> body( 0.0, -cl.gravity );
+    CabanaFluids::BodyForce<2> body( 0.0, -cl.gravity );
 
     MeshInitFunc<2> initializer( 0.0, { 0.0, 0.0 } );
-    auto solver = CajitaFluids::createSolver(
+    auto solver = CabanaFluids::createSolver(
         cl.device, MPI_COMM_WORLD, cl.global_bounding_box, cl.global_num_cells,
         partitioner, cl.density, initializer, bc, source, body, cl.delta_t,
         cl.solver, cl.precon );
@@ -479,7 +479,7 @@ int main( int argc, char* argv[] )
     if ( rank == 0 )
     {
         // Print Command Line Options
-        std::cout << "CajitaFluids\n";
+        std::cout << "CabanaFluids\n";
         std::cout << "=======Command line arguments=======\n";
         std::cout << std::left << std::setw( 20 ) << "Thread Setting"
                   << ": " << std::setw( 8 ) << cl.device

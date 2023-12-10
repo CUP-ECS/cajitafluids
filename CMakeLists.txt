@@ -1,7 +1,7 @@
 # project settings
 cmake_minimum_required(VERSION 3.18)
 
-project(CajitaFluids LANGUAGES C CXX VERSION 0.1.0)
+project(CabanaFluids LANGUAGES C CXX VERSION 0.1.0)
 
 include(GNUInstallDirs)
 
@@ -54,14 +54,17 @@ endif()
 include(${BLT_SOURCE_DIR}/SetupBLT.cmake)
 
 # Get the dependent packages we need
-find_package(Cabana REQUIRED COMPONENTS Cabana::Cajita Cabana::cabanacore)
+find_package(Cabana REQUIRED COMPONENTS Cabana::Grid Cabana::Core)
 if( NOT Cabana_ENABLE_MPI )
   message( FATAL_ERROR "Cabana must be compiled with MPI" )
 endif()
-if( NOT Cabana_ENABLE_CAJITA )
-  message( FATAL_ERROR "Cabana must be compiled with Cajita" )
+if( NOT Cabana_ENABLE_GRID )
+  message( FATAL_ERROR "Cabana must be compiled with grid support" )
 endif()
-find_package(Silo REQUIRED)
+if( NOT Cabana_ENABLE_HYPRE )
+  message( FATAL_ERROR "Cabana must be compiled with HYPRE support" )
+endif()
+find_package(SILO REQUIRED)
 
 # Get Clang Format to use for making sure the resulting code is
 # properly formatted

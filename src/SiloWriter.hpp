@@ -34,6 +34,7 @@ class SiloWriter
 {
   public:
     using pm_type = ProblemManager<Dims, ExecutionSpace, MemorySpace>;
+    using memory_space = MemorySpace;
     using device_type = Kokkos::Device<ExecutionSpace, MemorySpace>;
     /**
      * Constructor
@@ -70,7 +71,7 @@ class SiloWriter
 
         // Rertrieve the Local Grid and Local Mesh
         auto local_grid = _pm->mesh()->localGrid();
-        auto local_mesh = *( _pm->mesh()->localMesh() );
+        auto local_mesh = Cabana::Grid::createLocalMesh<memory_space>(*local_grid);
 
         Kokkos::Profiling::pushRegion( "SiloWriter::WriteFile" );
 
@@ -312,13 +313,13 @@ class SiloWriter
             q_block_names[i] = (char*)malloc( 1024 );
             v_block_names[i] = (char*)malloc( 1024 );
 
-            sprintf( mesh_block_names[i],
+            snprintf( mesh_block_names[i], 1024, 
                      "raw/CabanaFluidsOutput%05d%05d.%s:/domain_%05d/Mesh",
                      group_rank, time_step, file_ext, i );
-            sprintf( q_block_names[i],
+            snprintf( q_block_names[i], 1024,
                      "raw/CabanaFluidsOutput%05d%05d.%s:/domain_%05d/quantity",
                      group_rank, time_step, file_ext, i );
-            sprintf( v_block_names[i],
+            snprintf( v_block_names[i], 1024,
                      "raw/CabanaFluidsOutput%05d%05d.%s:/domain_%05d/velocity",
                      group_rank, time_step, file_ext, i );
             block_types[i] = DB_QUADMESH;
@@ -380,12 +381,12 @@ class SiloWriter
                         createSiloFile, openSiloFile, closeSiloFile, &driver );
 
         // Set Filename to Reflect TimeStep
-        sprintf( masterfilename, "data/CabanaFluids%05d.%s", time_step,
+        snprintf( masterfilename, 256, "data/CabanaFluids%05d.%s", time_step,
                  file_ext );
-        sprintf( filename, "data/raw/CabanaFluidsOutput%05d%05d.%s",
+        snprintf( filename, 256, "data/raw/CabanaFluidsOutput%05d%05d.%s",
                  PMPIO_GroupRank( baton, _pm->mesh()->rank() ), time_step,
                  file_ext );
-        sprintf( nsname, "domain_%05d", _pm->mesh()->rank() );
+        snprintf( nsname, 256, "domain_%05d", _pm->mesh()->rank() );
 
         // Show Errors and Force FLoating Point
         DBShowErrors( DB_ALL, NULL );

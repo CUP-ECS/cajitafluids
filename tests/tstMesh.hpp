@@ -4,7 +4,7 @@
 #include "gtest/gtest.h"
 
 #include <Cabana_Core.hpp>
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 #include <Kokkos_Core.hpp>
 
 #include <Mesh.hpp>
@@ -25,20 +25,20 @@
 template <class T>
 class MeshTest : public ::testing::Test
 {
-    // We need Cajita Arrays
+    // We need Cabana Grid Arrays
     // Convenience type declarations
-    using Cell = Cajita::Cell;
+    using Cell = Cabana::Grid::Cell;
 
     using cell_array =
-        Cajita::Array<double, Cajita::Cell, Cajita::UniformMesh<double, 2>,
+        Cabana::Grid::Array<double, Cabana::Grid::Cell, Cabana::Grid::UniformMesh<double, 2>,
                       typename T::MemorySpace>;
     using iface_array =
-        Cajita::Array<double, Cajita::Face<Cajita::Dim::I>,
-                      Cajita::UniformMesh<double, 2>, typename T::MemorySpace>;
+        Cabana::Grid::Array<double, Cabana::Grid::Face<Cabana::Grid::Dim::I>,
+                      Cabana::Grid::UniformMesh<double, 2>, typename T::MemorySpace>;
     using jface_array =
-        Cajita::Array<double, Cajita::Face<Cajita::Dim::J>,
-                      Cajita::UniformMesh<double, 2>, typename T::MemorySpace>;
-    using mesh_type = CajitaFluids::Mesh<2, typename T::ExecutionSpace,
+        Cabana::Grid::Array<double, Cabana::Grid::Face<Cabana::Grid::Dim::J>,
+                      Cabana::Grid::UniformMesh<double, 2>, typename T::MemorySpace>;
+    using mesh_type = Cabana::Grid::Mesh<2, typename T::ExecutionSpace,
                                          typename T::MemorySpace>;
 
   protected:
@@ -48,7 +48,7 @@ class MeshTest : public ::testing::Test
 
     virtual void SetUp() override
     {
-        // Allocate and initialize the Cajita mesh
+        // Allocate and initialize the Cabana::Grid mesh
         globalBoundingBox_ = { 0, 0, boxWidth_, boxWidth_ };
         globalNumCells_ = { boxCells_, boxCells_ };
         testMesh_ = std::make_shared<mesh_type>( globalBoundingBox_,
@@ -58,7 +58,7 @@ class MeshTest : public ::testing::Test
 
     virtual void TearDown() override { testMesh_ = NULL; }
 
-    Cajita::DimBlockPartitioner<2> partitioner_;
+    Cabana::Grid::DimBlockPartitioner<2> partitioner_;
     std::array<int, 2> globalNumCells_;
     Kokkos::Array<double, 4> globalBoundingBox_;
 

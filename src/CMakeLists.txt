@@ -16,9 +16,9 @@ set(SOURCES
   )
 
 set(DEPENDS_ON
-  Cabana::core
-  Cabana::grid
-  Silo::silo 
+  Cabana::Core
+  Cabana::Grid
+  SILO::silo 
   mpi
   )
  

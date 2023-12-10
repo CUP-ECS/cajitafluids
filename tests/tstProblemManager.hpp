@@ -2,7 +2,7 @@
 #define _TSTPROBLEMMANGER_HPP_
 
 #include <Cabana_Core.hpp>
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 #include <Kokkos_Core.hpp>
 #include <ProblemManager.hpp>
 
@@ -15,7 +15,7 @@ class NullInitFunctor
 {
   public:
     KOKKOS_INLINE_FUNCTION
-    bool operator()( Cajita::Cell, CajitaFluids::Field::Quantity,
+    bool operator()( Cabana::Grid::Cell, CabanaFluids::Field::Quantity,
                      [[maybe_unused]] const int index[Dim],
                      [[maybe_unused]] const double x[Dim],
                      [[maybe_unused]] double& quantity ) const
@@ -24,8 +24,8 @@ class NullInitFunctor
     };
 
     KOKKOS_INLINE_FUNCTION
-    bool operator()( Cajita::Face<Cajita::Dim::I>,
-                     CajitaFluids::Field::Velocity,
+    bool operator()( Cabana::Grid::Face<Cabana::Grid::Dim::I>,
+                     CabanaFluids::Field::Velocity,
                      [[maybe_unused]] const int index[Dim],
                      [[maybe_unused]] const double x[Dim],
                      [[maybe_unused]] double& quantity ) const
@@ -34,8 +34,8 @@ class NullInitFunctor
     };
 
     KOKKOS_INLINE_FUNCTION
-    bool operator()( Cajita::Face<Cajita::Dim::J>,
-                     CajitaFluids::Field::Velocity,
+    bool operator()( Cabana::Grid::Face<Cabana::Grid::Dim::J>,
+                     CabanaFluids::Field::Velocity,
                      [[maybe_unused]] const int index[Dim],
                      [[maybe_unused]] const double x[Dim],
                      [[maybe_unused]] double& quantity ) const
@@ -48,7 +48,7 @@ template <class T>
 class ProblemManagerTest : public MeshTest<T>
 {
 
-    using pm_type = CajitaFluids::ProblemManager<2, typename T::ExecutionSpace,
+    using pm_type = Cabana::Grid::ProblemManager<2, typename T::ExecutionSpace,
                                                  typename T::MemorySpace>;
 
   protected:

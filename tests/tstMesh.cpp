@@ -1,7 +1,7 @@
 #include "gtest/gtest.h"
 
 #include <Cabana_Core.hpp>
-#include <Cajita.hpp>
+#include <Cabana_Grid.hpp>
 #include <Kokkos_Core.hpp>
 
 #include <Mesh.hpp>
@@ -40,12 +40,12 @@ TYPED_TEST( MeshTest, LocalGridSetup )
     for ( int i = 0; i < 2; i++ )
     {
         EXPECT_EQ( this->boxCells_,
-                   global_grid.globalNumEntity( Cajita::Cell(), i ) );
+                   global_grid.globalNumEntity( Cabana::Grid::Cell(), i ) );
     }
 
     /* Make sure the number of owned cells is our share of what was requested */
     auto own_local_cell_space = local_grid->indexSpace(
-        Cajita::Own(), Cajita::Cell(), Cajita::Local() );
+        Cabana::Grid::Own(), Cabana::Grid::Cell(), Cabana::Grid::Local() );
     for ( int i = 0; i < 2; i++ )
     {
         EXPECT_EQ( own_local_cell_space.extent( i ),
@@ -59,7 +59,7 @@ TYPED_TEST( MeshTest, LocalGridSetup )
      * spatial dimension.
      */
     auto ghost_local_face_space = local_grid->indexSpace(
-        Cajita::Ghost(), Cajita::Face<Cajita::Dim::I>(), Cajita::Local() );
+        Cabana::Grid::Ghost(), Cabana::Grid::Face<Cabana::Grid::Dim::I>(), Cabana::Grid::Local() );
     EXPECT_EQ( ghost_local_face_space.extent( 0 ),
                this->boxCells_ / global_grid.dimNumBlock( 1 ) +
                    2 * this->haloWidth_ + 1 );
